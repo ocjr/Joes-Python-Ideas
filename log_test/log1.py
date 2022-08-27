@@ -1,7 +1,7 @@
 import logging
 import logging.config
 from pathlib import Path
-from log2 import joes_formatter
+from log_test import log2
 
 LOGGING_CONFIG = Path(__file__).parent /'config'/'logging.conf'
 logging.config.fileConfig(LOGGING_CONFIG)
@@ -17,10 +17,10 @@ def hello_world(name:str = 'Joe', log_level:str = 'INFO') -> str:
         logger.setLevel(logging.DEBUG)
     else:
         logger.setLevel(logging.WARN)
-        
+
     logger.info('log1.hello_world() has begun')
     output = 'Hello World, and Hello {name}'
     logger.debug('output object: ' + output)
-    formatted_output = joes_formatter(output, name, log_level)
+    formatted_output = log2.joes_formatter(output, name, log_level)
     logger.debug('formatted_output object: ' + formatted_output)
     return formatted_output
