@@ -1,0 +1,1 @@
+recursive-include log_test/config *.conf
