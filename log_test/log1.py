@@ -1,14 +1,23 @@
-import os
 import logging
 import logging.config
-from pathlib import Path
 
-os.chdir = Path(__file__).parent
-LOGGING_CONFIG = 'logging.conf'
-logging.config.fileConfig(LOGGING_CONFIG)
+# create logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
-logger = logging.getLogger('simpleExample')
-logger.setLevel('DEBUG')
+# create fileHandler and set level to DEBUG
+fh = logging.FileHandler(filename='test.log')
+fh.setLevel(logging.DEBUG)
+
+# create formatter
+formatter = logging.Formatter('%(asctime)s - %(filename)s(%(lineno)s) - %(levelname)s - %(message)s')
+formatter.datefmt = '%m/%d/%Y %H:%M:%S %Z(%z)'
+
+# add formatter to fh
+fh.setFormatter(formatter)
+
+# add fh to logger
+logger.addHandler(fh)
 
 def hello_world(name:str = 'Joe', log_level:str = 'INFO') -> str:
     """Hello World function that prints 'Hello World, name', 
