@@ -3,28 +3,28 @@ import logging.config
 from pathlib import Path
 
 LOGGING_CONFIG = Path(__file__).parent /'config'/'logging.conf'
-#logging.config.fileConfig(LOGGING_CONFIG)
+logging.config.fileConfig(LOGGING_CONFIG)
 
-#logger = logging.getLogger('simpleExample')
+logger = logging.getLogger('simpleExample')
 
 
 # create logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+#logger = logging.getLogger(__name__)
+#logger.setLevel(logging.DEBUG)
 
 # create fileHandler and set level to DEBUG
-fh = logging.FileHandler(filename='test.log')
-fh.setLevel(logging.DEBUG)
+#fh = logging.FileHandler(filename='test.log')
+#fh.setLevel(logging.DEBUG)
 
 # create formatter
-formatter = logging.Formatter('%(asctime)s - %(filename)s(%(lineno)s) - %(levelname)s - %(message)s')
-formatter.datefmt = '%m/%d/%Y %H:%M:%S %Z(%z)'
+#formatter = logging.Formatter('%(asctime)s - %(filename)s(%(lineno)s) - %(levelname)s - %(message)s')
+#formatter.datefmt = '%m/%d/%Y %H:%M:%S %Z(%z)'
 
 # add formatter to fh
-fh.setFormatter(formatter)
+#fh.setFormatter(formatter)
 
 # add fh to logger
-logger.addHandler(fh)
+#logger.addHandler(fh)
 
 def hello_world(name:str = 'Joe', log_level:str = 'INFO') -> str:
     """Hello World function that prints 'Hello World, name', 
