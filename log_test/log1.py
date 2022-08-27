@@ -6,7 +6,7 @@ LOGGING_CONFIG = path.dirname(__file__) + '/logging.conf'
 logging.config.fileConfig(LOGGING_CONFIG)
 
 logger = logging.getLogger('simpleExample')
-logger.setLevel('INFO')
+logger.setLevel('DEBUG')
 
 def hello_world(name:str = 'Joe', log_level:str = 'INFO') -> str:
     """Hello World function that prints 'Hello World, name', 
