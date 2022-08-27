@@ -3,7 +3,7 @@ import logging.config
 from pathlib import Path
 
 #LOGGING_CONFIG = str(Path(__file__).parent / 'logging.conf')
-LOGGING_CONFIG = '../logging.conf'
+LOGGING_CONFIG = 'logging.conf'
 logging.config.fileConfig(LOGGING_CONFIG)
 
 logger = logging.getLogger('simpleExample')
