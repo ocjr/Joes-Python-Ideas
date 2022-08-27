@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='logging_learning',
-    version='0.0.36',
+    version='0.0.37',
     description='Package to test and learn about logging',
     url='git@github.com/ocjr/joes-python-ideas.git',
     author='Joe OConnell',
