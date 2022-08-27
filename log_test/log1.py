@@ -1,8 +1,9 @@
+import os
 import logging
 import logging.config
 from pathlib import Path
 
-#LOGGING_CONFIG = str(Path(__file__).parent / 'logging.conf')
+os.chdir = Path(__file__).parent
 LOGGING_CONFIG = 'logging.conf'
 logging.config.fileConfig(LOGGING_CONFIG)
 
