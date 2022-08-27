@@ -1,7 +1,9 @@
 import logging
 import logging.config
+from os import path
 
-logging.config.fileConfig('logging.conf')
+LOGGING_CONFIG = path(__file__).parent / 'logging.conf'
+logging.config.fileConfig(LOGGING_CONFIG)
 
 logger = logging.getLogger('simpleExample')
 
