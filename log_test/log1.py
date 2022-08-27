@@ -24,7 +24,7 @@ def hello_world(name:str = 'Joe', log_level:str = 'INFO') -> str:
     """Hello World function that prints 'Hello World, name', 
         after calling a few unnecessary functions to test the logs."""
     logger.info('log1.hello_world() has begun')
-    logger.info(Path(__name__).parent)
+    logger.info(Path(__file__).parent)
     output = 'Hello World, and Hello {name}'
     logger.debug('output object: ' + output)
     formatted_output = output.format(name=name)
