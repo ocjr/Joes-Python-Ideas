@@ -1,38 +1,26 @@
 import logging
 import logging.config
 from pathlib import Path
+from log2 import joes_formatter
 
 LOGGING_CONFIG = Path(__file__).parent /'config'/'logging.conf'
 logging.config.fileConfig(LOGGING_CONFIG)
 
 logger = logging.getLogger('simpleExample')
 
-
-# create logger
-#logger = logging.getLogger(__name__)
-#logger.setLevel(logging.DEBUG)
-
-# create fileHandler and set level to DEBUG
-#fh = logging.FileHandler(filename='test.log')
-#fh.setLevel(logging.DEBUG)
-
-# create formatter
-#formatter = logging.Formatter('%(asctime)s - %(filename)s(%(lineno)s) - %(levelname)s - %(message)s')
-#formatter.datefmt = '%m/%d/%Y %H:%M:%S %Z(%z)'
-
-# add formatter to fh
-#fh.setFormatter(formatter)
-
-# add fh to logger
-#logger.addHandler(fh)
-
 def hello_world(name:str = 'Joe', log_level:str = 'INFO') -> str:
     """Hello World function that prints 'Hello World, name', 
         after calling a few unnecessary functions to test the logs."""
+    if log_level == 'INFO':
+        logger.setLevel(logging.INFO)
+    elif log_level == 'DEBUG':
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.WARN)
+        
     logger.info('log1.hello_world() has begun')
-    logger.info(LOGGING_CONFIG)
     output = 'Hello World, and Hello {name}'
     logger.debug('output object: ' + output)
-    formatted_output = output.format(name=name)
+    formatted_output = joes_formatter(output, name, log_level)
     logger.debug('formatted_output object: ' + formatted_output)
     return formatted_output
