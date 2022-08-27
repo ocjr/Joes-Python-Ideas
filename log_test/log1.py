@@ -2,7 +2,7 @@ import logging
 import logging.config
 from os import path
 
-LOGGING_CONFIG = path(__file__).parent / 'logging.conf'
+LOGGING_CONFIG = path.dirname(__file__).parent / 'logging.conf'
 logging.config.fileConfig(LOGGING_CONFIG)
 
 logger = logging.getLogger('simpleExample')
