@@ -1,0 +1,6 @@
+[submodule "client-1"]
+    path = client-1
+    url = https://github.com/ocjr/Joes-Python-Ideas/client-1/repository.git
+[submodule "client-2"]
+    path = client-2
+    url = https://github.com/ocjr/Joes-Python-Ideas/client-2/repository.git
