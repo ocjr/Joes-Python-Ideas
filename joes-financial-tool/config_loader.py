@@ -189,6 +189,7 @@ def save_config(config: FinancialConfig, config_path: Union[str, Path]) -> None:
                 "minimum_payment": cc.minimum_payment,
                 "statement_day": cc.statement_day,
                 "payment_account": cc.payment_account,
+                "primary_for_purchases": cc.primary_for_purchases,
             }
             for cc in config.credit_cards
         ],

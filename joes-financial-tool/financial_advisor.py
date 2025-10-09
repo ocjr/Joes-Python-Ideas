@@ -212,6 +212,97 @@ def recommend_lump_sum_payment(
     return recommendations
 
 
+def recommend_primary_card(optimizer: FinancialOptimizer) -> dict[str, Any]:
+    """
+    Recommend which credit card to use as primary for daily purchases.
+
+    Analyzes credit cards based on available credit, APR, and rewards to
+    determine the best card for maximizing available credit while minimizing
+    interest costs.
+
+    Parameters
+    ----------
+    optimizer : FinancialOptimizer
+        Configured optimizer with current financial state
+
+    Returns
+    -------
+    dict[str, Any]
+        Dictionary with keys:
+        - recommended_card_id (str): ID of the recommended card
+        - card_name (str): Name of the recommended card
+        - reason (str): Explanation for the recommendation
+        - available_credit (float): Available credit on recommended card
+        - utilization (float): Current utilization percentage
+
+    Notes
+    -----
+    Recommendation criteria (in priority order):
+    1. Cards with lowest utilization (maximize available credit)
+    2. Cards with lowest APR (minimize interest if balance carried)
+    3. Cards with highest credit limit (more flexibility)
+    """
+    cards_with_credit = [
+        cc for cc in optimizer.config.credit_cards if cc.available_credit > 0
+    ]
+
+    if not cards_with_credit:
+        return {
+            "recommended_card_id": None,
+            "card_name": None,
+            "reason": "No cards have available credit",
+            "available_credit": 0,
+            "utilization": 100,
+        }
+
+    # Score each card (lower is better)
+    # Priority: Low utilization > Low APR > High credit limit
+    scored_cards = []
+    for cc in cards_with_credit:
+        # Utilization score (0-100, lower is better)
+        util_score = cc.utilization
+
+        # APR score (0-100, normalized to percentage)
+        apr_score = cc.apr * 100
+
+        # Credit limit score (inverted - higher limit is better)
+        # Normalize to 0-100 scale
+        max_limit = max(c.credit_limit for c in cards_with_credit)
+        limit_score = 100 * (1 - (cc.credit_limit / max_limit))
+
+        # Weighted score: utilization (50%), APR (30%), limit (20%)
+        total_score = (util_score * 0.5) + (apr_score * 0.3) + (limit_score * 0.2)
+
+        scored_cards.append((total_score, cc))
+
+    # Sort by score (lowest first)
+    scored_cards.sort(key=lambda x: x[0])
+    best_card = scored_cards[0][1]
+
+    # Build recommendation reason
+    reasons = []
+    if best_card.utilization < 30:
+        reasons.append(f"low utilization ({best_card.utilization:.1f}%)")
+    if best_card.apr < 0.15:
+        reasons.append(f"low APR ({best_card.apr * 100:.1f}%)")
+    if best_card.available_credit > 1000:
+        reasons.append(f"high available credit (${best_card.available_credit:,.2f})")
+
+    reason = (
+        "Best card for purchases: " + ", ".join(reasons)
+        if reasons
+        else "Has available credit"
+    )
+
+    return {
+        "recommended_card_id": best_card.id,
+        "card_name": best_card.name,
+        "reason": reason,
+        "available_credit": best_card.available_credit,
+        "utilization": best_card.utilization,
+    }
+
+
 def interactive_advice(optimizer: FinancialOptimizer) -> None:
     """
     Interactive financial advice menu.
@@ -229,6 +320,7 @@ def interactive_advice(optimizer: FinancialOptimizer) -> None:
     Available advice options:
     1. Can I afford a purchase? - Checks if a specific purchase is safe
     2. How should I allocate a lump sum? - Provides debt payoff recommendations
+    3. Which card should I use for purchases? - Recommends primary card
 
     The function handles all user input and displays results in a formatted manner.
     """
@@ -237,9 +329,10 @@ def interactive_advice(optimizer: FinancialOptimizer) -> None:
     print("What would you like advice on?\n")
     print("  1. Can I afford a purchase?")
     print("  2. How should I allocate a lump sum payment?")
+    print("  3. Which credit card should I use for daily purchases?")
     print("  0. Cancel\n")
 
-    choice = input("Select (0-2): ").strip()
+    choice = input("Select (0-3): ").strip()
 
     if choice == "1":
         # Purchase affordability
@@ -278,6 +371,22 @@ def interactive_advice(optimizer: FinancialOptimizer) -> None:
 
         except ValueError:
             print("❌ Invalid input\n")
+
+    elif choice == "3":
+        # Primary card recommendation
+        print("\n--- Primary Card Recommendation ---\n")
+
+        result = recommend_primary_card(optimizer)
+
+        if result["recommended_card_id"]:
+            print(f"✓ Recommended: {result['card_name']}\n")
+            print(f"📊 {result['reason']}")
+            print(f"   Available Credit: ${result['available_credit']:,.2f}")
+            print(f"   Current Utilization: {result['utilization']:.1f}%\n")
+            print("💡 This card will maximize your available credit while")
+            print("   minimizing potential interest charges.\n")
+        else:
+            print(f"❌ {result['reason']}\n")
 
     elif choice == "0":
         print()

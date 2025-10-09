@@ -141,6 +141,7 @@ class CreditCard:
     minimum_payment: float
     statement_day: Optional[int] = None
     payment_account: Optional[str] = None
+    primary_for_purchases: bool = False  # Use this card for daily purchases
 
     def __post_init__(self):
         if not 1 <= self.due_day <= 31:
@@ -154,6 +155,11 @@ class CreditCard:
     def utilization(self) -> float:
         """Calculate credit utilization percentage."""
         return (self.balance / self.credit_limit) * 100 if self.credit_limit > 0 else 0
+
+    @property
+    def available_credit(self) -> float:
+        """Calculate available credit remaining."""
+        return max(0, self.credit_limit - self.balance)
 
     @property
     def daily_interest(self) -> float:

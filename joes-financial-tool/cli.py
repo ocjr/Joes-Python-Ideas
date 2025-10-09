@@ -201,9 +201,7 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
                     account_balances[event.account_id] += event.amount
                 else:
                     # Default to first checking account if no account specified
-                    checking = next(
-                        (a for a in accounts if not a["is_credit"]), None
-                    )
+                    checking = next((a for a in accounts if not a["is_credit"]), None)
                     if checking:
                         account_balances[checking["id"]] += event.amount
 
@@ -231,26 +229,63 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
                         extra_payment = safe_payments.get(cc_id, 0)
                         total_payment = min_payment + extra_payment
 
-                        # Deduct from payment account
+                        # Determine payment account
                         payment_account = cc.payment_account
-                        if payment_account and payment_account in account_balances:
-                            account_balances[payment_account] -= total_payment
-                        else:
+                        if (
+                            not payment_account
+                            or payment_account not in account_balances
+                        ):
                             # Default to first checking account
                             checking = next(
                                 (a for a in accounts if not a["is_credit"]), None
                             )
                             if checking:
-                                account_balances[checking["id"]] -= total_payment
+                                payment_account = checking["id"]
 
-                        # Reduce credit card balance
-                        account_balances[cc_id] -= total_payment
+                        # Check if payment would make account negative
+                        if payment_account and payment_account in account_balances:
+                            current_balance = account_balances[payment_account]
+                            if current_balance < total_payment:
+                                # Reduce extra payment to prevent negative balance
+                                # Keep minimum balance requirement in mind
+                                min_balance_req = next(
+                                    (
+                                        acc.minimum_balance
+                                        for acc in optimizer.config.accounts
+                                        if acc.id == payment_account
+                                    ),
+                                    0,
+                                )
+                                max_payment = max(
+                                    min_payment, current_balance - min_balance_req
+                                )
+                                if max_payment < min_payment:
+                                    # Can't afford even minimum payment - flag this
+                                    action = f"⚠️  WARNING: Cannot afford {cc.name} minimum payment (need ${min_payment:,.2f}, have ${current_balance:,.2f})"
+                                    total_payment = 0
+                                    extra_payment = 0
+                                else:
+                                    extra_payment = max(0, max_payment - min_payment)
+                                    total_payment = min_payment + extra_payment
+                                    if extra_payment > 0:
+                                        daily_savings = (extra_payment * cc.apr) / 365
+                                        action = f"Pay {cc.name} (${min_payment:,.2f} min + ${extra_payment:,.2f} extra, saves ${daily_savings:.2f}/day) [REDUCED]"
+                                    else:
+                                        action = f"Pay {cc.name} (minimum only - limited funds)"
 
-                        if extra_payment > 0:
-                            daily_savings = (extra_payment * cc.apr) / 365
-                            action = f"Pay {cc.name} (${min_payment:,.2f} min + ${extra_payment:,.2f} extra, saves ${daily_savings:.2f}/day)"
-                        else:
-                            action = f"Pay {cc.name} (minimum)"
+                            else:
+                                # Normal case - can afford payment
+                                if extra_payment > 0:
+                                    daily_savings = (extra_payment * cc.apr) / 365
+                                    action = f"Pay {cc.name} (${min_payment:,.2f} min + ${extra_payment:,.2f} extra, saves ${daily_savings:.2f}/day)"
+                                else:
+                                    action = f"Pay {cc.name} (minimum)"
+
+                            # Deduct from payment account only if we can afford it
+                            if total_payment > 0:
+                                account_balances[payment_account] -= total_payment
+                                # Reduce credit card balance
+                                account_balances[cc_id] -= total_payment
 
                         transactions.append(
                             {
@@ -272,27 +307,50 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
                         .strip()
                     )
                     autopay = " [AUTO]" if "[AUTO]" in event.description else ""
+                    bill_amount = abs(event.amount)
 
                     # Deduct from payment account
                     payment_account = event.account_id
-                    if payment_account and payment_account in account_balances:
-                        account_balances[payment_account] -= abs(event.amount)
-                    else:
+                    if not payment_account or payment_account not in account_balances:
                         # Default to first checking account
                         checking = next(
                             (a for a in accounts if not a["is_credit"]), None
                         )
                         if checking:
-                            account_balances[checking["id"]] -= abs(event.amount)
+                            payment_account = checking["id"]
 
-                    transactions.append(
-                        {
-                            "date": current_date,
-                            "action": f"Bill: {description}{autopay}",
-                            "amount": event.amount,
-                            "balances": dict(account_balances),
-                        }
-                    )
+                    # Check if payment would make account negative
+                    if payment_account and payment_account in account_balances:
+                        current_balance = account_balances[payment_account]
+                        min_balance_req = next(
+                            (
+                                acc.minimum_balance
+                                for acc in optimizer.config.accounts
+                                if acc.id == payment_account
+                            ),
+                            0,
+                        )
+
+                        if current_balance - bill_amount < min_balance_req:
+                            # Would go below minimum - flag as warning
+                            action_text = f"⚠️  WARNING: Cannot afford bill {description}{autopay} (need ${bill_amount:,.2f}, have ${current_balance - min_balance_req:,.2f} available)"
+                            # Don't deduct - just warn
+                        else:
+                            account_balances[payment_account] -= bill_amount
+                            action_text = f"Bill: {description}{autopay}"
+
+                        transactions.append(
+                            {
+                                "date": current_date,
+                                "action": action_text,
+                                "amount": (
+                                    event.amount
+                                    if current_balance - bill_amount >= min_balance_req
+                                    else 0
+                                ),
+                                "balances": dict(account_balances),
+                            }
+                        )
 
         # Add emergency fund transfer if applicable
         if emergency_fund_payment > 0:
@@ -327,7 +385,8 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
     print("Display format:")
     print("  1. Table (screen-friendly)")
     print("  2. CSV (export-friendly)")
-    format_choice = input("\nSelect format (1-2, default 1): ").strip()
+    print("  3. Summary (totals only)")
+    format_choice = input("\nSelect format (1-3, default 1): ").strip()
     print()
 
     if format_choice == "2":
@@ -363,6 +422,80 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
 
                 print(f"{balance_str},", end="")
             print()
+    elif format_choice == "3":
+        # Summary format with totals
+        print(
+            "Date      | Action                            | Amount      | Total Check | Total Saves | Total Debt  | Avail Credit|"
+        )
+        print(
+            "-" * 10
+            + "+"
+            + "-" * 36
+            + "+"
+            + "-" * 13
+            + "+"
+            + "-" * 13
+            + "+"
+            + "-" * 13
+            + "+"
+            + "-" * 13
+            + "+"
+            + "-" * 13
+            + "+"
+        )
+
+        for txn in transactions:
+            date_str = txn["date"].strftime("%a %m/%d")
+            action = txn["action"][:34].ljust(34)
+
+            # Format amount
+            if txn["amount"] is None:
+                amount_str = "".ljust(11)
+            elif txn["amount"] >= 0:
+                amount_str = f"+${txn['amount']:>8,.2f}"
+            else:
+                amount_str = f"-${abs(txn['amount']):>8,.2f}"
+
+            # Calculate totals
+            total_checking = sum(
+                txn["balances"].get(acc["id"], 0)
+                for acc in accounts
+                if not acc["is_credit"]
+                and any(
+                    t in acc["name"].lower()
+                    for t in ["checking", "check", "main", "cash"]
+                )
+            )
+            total_savings = sum(
+                txn["balances"].get(acc["id"], 0)
+                for acc in accounts
+                if not acc["is_credit"]
+                and any(
+                    t in acc["name"].lower()
+                    for t in ["savings", "save", "emergency", "fund"]
+                )
+            )
+            total_debt = sum(
+                txn["balances"].get(acc["id"], 0)
+                for acc in accounts
+                if acc["is_credit"]
+            )
+            total_avail_credit = sum(
+                optimizer.config.credit_cards[
+                    next(
+                        i
+                        for i, cc in enumerate(optimizer.config.credit_cards)
+                        if cc.id == acc["id"]
+                    )
+                ].credit_limit
+                - txn["balances"].get(acc["id"], 0)
+                for acc in accounts
+                if acc["is_credit"]
+            )
+
+            print(
+                f"{date_str} | {action} | {amount_str} | ${total_checking:>9,.2f} | ${total_savings:>9,.2f} | ${total_debt:>9,.2f} | ${total_avail_credit:>9,.2f} |"
+            )
     else:
         # Table format with pipes for better readability
         print("Date      | Action                            | Amount      |", end="")
@@ -371,7 +504,15 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
             name = acc["name"][:11].ljust(11)
             print(f" {name} |", end="")
         print()
-        print("-" * 10 + "+" + "-" * 36 + "+" + "-" * 13 + "+" + ("-" * 13 + "+") * len(accounts))
+        print(
+            "-" * 10
+            + "+"
+            + "-" * 36
+            + "+"
+            + "-" * 13
+            + "+"
+            + ("-" * 13 + "+") * len(accounts)
+        )
 
         # Print transactions
         for txn in transactions:
