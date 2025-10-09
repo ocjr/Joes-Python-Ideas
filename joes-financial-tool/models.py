@@ -44,20 +44,46 @@ class Account:
 
 
 @dataclass
+class IncomeSplit:
+    """Represents how to split income across accounts."""
+    account_id: str
+    amount: Optional[float] = None  # None means "remainder"
+
+    def __post_init__(self):
+        if self.amount is not None and self.amount < 0:
+            raise ValueError("Split amount must be positive")
+
+
+@dataclass
 class Income:
-    """Represents an income source."""
+    """Represents an income source with optional account splitting."""
     id: str
     source: str
     amount: float
     frequency: Frequency
     next_date: date
-    deposit_account: Optional[str] = None
+    deposit_account: Optional[str] = None  # Deprecated, use splits instead
+    splits: Optional[list[IncomeSplit]] = None  # New: split across multiple accounts
 
     def __post_init__(self):
         if isinstance(self.frequency, str):
             self.frequency = Frequency(self.frequency)
         if isinstance(self.next_date, str):
             self.next_date = datetime.strptime(self.next_date, "%Y-%m-%d").date()
+
+        # Convert splits from dicts if needed
+        if self.splits and isinstance(self.splits[0], dict):
+            self.splits = [IncomeSplit(**s) for s in self.splits]
+
+    def get_splits(self) -> list[IncomeSplit]:
+        """Get income splits, falling back to deposit_account if no splits defined."""
+        if self.splits:
+            return self.splits
+        elif self.deposit_account:
+            # Backward compatibility: single deposit account
+            return [IncomeSplit(account_id=self.deposit_account, amount=None)]
+        else:
+            return []
 
 
 @dataclass

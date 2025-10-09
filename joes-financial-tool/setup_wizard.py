@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from models import (
     FinancialConfig, Account, Income, Bill, CreditCard, Settings,
-    AccountType, Frequency, PayoffStrategy
+    AccountType, Frequency, PayoffStrategy, IncomeSplit
 )
 from config_loader import save_config, load_config
 
@@ -130,8 +130,8 @@ def setup_accounts():
     return accounts
 
 
-def setup_income():
-    """Set up income sources."""
+def setup_income(accounts):
+    """Set up income sources with account deposit/split configuration."""
     print_header("Step 2: Income Sources")
     print("Let's set up your income (paychecks, freelance, etc.).\n")
 
@@ -162,8 +162,47 @@ def setup_income():
             print("  ⚠️  Invalid date, using today")
             next_date = date.today()
 
-        # Deposit account (optional for now)
-        deposit_account = None
+        # Set up account deposits/splits
+        splits = []
+        print("\nHow should this income be deposited?")
+
+        if not accounts:
+            print("⚠️  No accounts available for deposit")
+            deposit_account = None
+        else:
+            account_choices = [f"{acc.name} ({acc.type.value})" for acc in accounts]
+
+            # Ask if they want to split
+            split_income = get_input("Split across multiple accounts? (y/n)", default="n", input_type=bool)
+
+            if split_income:
+                print("\nSet up splits (last account will receive remainder):")
+                total_allocated = 0.0
+
+                for i, acc in enumerate(accounts[:-1]):  # All but last
+                    split_amount = get_input(
+                        f"  Amount to {acc.name}",
+                        input_type=float,
+                        required=False
+                    )
+                    if split_amount and split_amount > 0:
+                        splits.append(IncomeSplit(account_id=acc.id, amount=split_amount))
+                        total_allocated += split_amount
+
+                # Last account gets remainder
+                if accounts:
+                    last_acc = accounts[-1]
+                    remainder = amount - total_allocated
+                    print(f"  Remainder to {last_acc.name}: ${remainder:,.2f}")
+                    splits.append(IncomeSplit(account_id=last_acc.id, amount=None))  # None = remainder
+            else:
+                # Single account
+                selected_label = get_choice("Deposit to which account?", account_choices)
+                selected_idx = account_choices.index(selected_label)
+                selected_account = accounts[selected_idx]
+                splits = [IncomeSplit(account_id=selected_account.id, amount=None)]
+
+            deposit_account = None  # Clear deprecated field
 
         # Create income ID from source
         income_id = source.lower().replace(' ', '_')
@@ -174,7 +213,8 @@ def setup_income():
             amount=amount,
             frequency=Frequency(frequency),
             next_date=next_date,
-            deposit_account=deposit_account
+            deposit_account=deposit_account,
+            splits=splits if splits else None
         ))
 
         print(f"\n✓ Added {source}: ${amount:,.2f} {frequency}")
@@ -377,7 +417,7 @@ def run_setup_wizard(output_path: str = "financial_config.json"):
     try:
         # Run through all setup steps in correct order
         accounts = setup_accounts()
-        income = setup_income()
+        income = setup_income(accounts)  # Pass accounts for splits
         credit_cards = setup_credit_cards()
         bills = setup_bills(accounts, credit_cards)  # Pass accounts and cards
         settings = setup_settings()

@@ -68,7 +68,14 @@ def save_config(config: FinancialConfig, config_path: Union[str, Path]) -> None:
                 'amount': inc.amount,
                 'frequency': inc.frequency.value,
                 'next_date': inc.next_date.isoformat(),
-                'deposit_account': inc.deposit_account
+                'deposit_account': inc.deposit_account,
+                'splits': [
+                    {
+                        'account_id': split.account_id,
+                        'amount': split.amount
+                    }
+                    for split in (inc.splits or [])
+                ] if inc.splits else None
             }
             for inc in config.income
         ],

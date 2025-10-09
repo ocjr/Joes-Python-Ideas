@@ -14,6 +14,9 @@ from setup_wizard import (
     run_setup_wizard, add_account_to_config, add_income_to_config,
     add_bill_to_config, add_credit_card_to_config
 )
+from edit_wizard import (
+    edit_account, edit_income, edit_bill, edit_credit_card
+)
 from config_manager import (
     get_dated_config_name, select_config_interactive, list_config_files
 )
@@ -50,10 +53,14 @@ def print_menu(current_config: str = "financial_config.json"):
     print("    8. ➕ Add New Income Source")
     print("    9. ➕ Add New Bill")
     print("   10. ➕ Add New Credit Card")
+    print("   11. ✏️  Edit Account")
+    print("   12. ✏️  Edit Income Source")
+    print("   13. ✏️  Edit Bill")
+    print("   14. ✏️  Edit Credit Card")
     print()
     print("  SETUP:")
-    print("   11. ⚙️  Run Full Setup Wizard (creates new dated config)")
-    print("   12. 📂 Load Previous Config")
+    print("   15. ⚙️  Run Full Setup Wizard (creates new dated config)")
+    print("   16. 📂 Load Previous Config")
     print()
     print("    0. 🚪 Exit")
     print()
@@ -63,10 +70,10 @@ def get_menu_choice():
     """Get user's menu choice."""
     while True:
         try:
-            choice = input("Select option (0-12): ").strip()
-            if choice.isdigit() and 0 <= int(choice) <= 12:
+            choice = input("Select option (0-16): ").strip()
+            if choice.isdigit() and 0 <= int(choice) <= 16:
                 return int(choice)
-            print("⚠️  Please enter a number between 0 and 12")
+            print("⚠️  Please enter a number between 0 and 16")
         except KeyboardInterrupt:
             print("\n")
             return 0
@@ -299,7 +306,7 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
             print("\n👋 Thanks for using Financial Optimization Tool!\n")
             break
 
-        elif choice == 11:
+        elif choice == 15:
             # Run full setup wizard - creates new dated config
             clear_screen()
             dated_config = get_dated_config_name()
@@ -310,7 +317,7 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
                 pause()
             continue
 
-        elif choice == 12:
+        elif choice == 16:
             # Load previous config
             clear_screen()
             print_header("Load Previous Configuration")
@@ -332,6 +339,20 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
                 add_bill_to_config(current_config)
             elif choice == 10:
                 add_credit_card_to_config(current_config)
+            pause()
+            continue
+
+        # For options 11-14, edit existing items (need valid config)
+        if choice in [11, 12, 13, 14]:
+            clear_screen()
+            if choice == 11:
+                edit_account(current_config)
+            elif choice == 12:
+                edit_income(current_config)
+            elif choice == 13:
+                edit_bill(current_config)
+            elif choice == 14:
+                edit_credit_card(current_config)
             pause()
             continue
 
