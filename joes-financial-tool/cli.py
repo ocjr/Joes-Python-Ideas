@@ -18,6 +18,7 @@ from edit_wizard import (
     edit_account, edit_income, edit_bill, edit_credit_card
 )
 from bill_tracker import mark_bill_paid
+from financial_advisor import interactive_advice
 from config_manager import (
     get_dated_config_name, select_config_interactive, list_config_files,
     get_most_recent_config
@@ -44,27 +45,30 @@ def print_menu(current_config: str = "financial_config.json"):
     print("Main Menu:\n")
     print("  VIEW:")
     print("    1. 📋 Today's Actions")
-    print("    2. 📅 5-Day Action Plan")
+    print("    2. 📅 Action Plan (custom days)")
     print("    3. 📊 Financial Summary")
     print("    4. 📈 14-Day Cash Flow Forecast")
     print("    5. 🏦 Account Details")
     print("    6. 📖 View All Information")
     print()
+    print("  ADVICE:")
+    print("    7. 💡 Financial Advice")
+    print()
     print("  MANAGE:")
-    print("    7. ✅ Mark Bill as Paid")
-    print("    8. 🔄 Update Account Balances")
-    print("    9. ➕ Add New Account")
-    print("   10. ➕ Add New Income Source")
-    print("   11. ➕ Add New Bill")
-    print("   12. ➕ Add New Credit Card")
-    print("   13. ✏️  Edit Account")
-    print("   14. ✏️  Edit Income Source")
-    print("   15. ✏️  Edit Bill")
-    print("   16. ✏️  Edit Credit Card")
+    print("    8. ✅ Mark Bill as Paid")
+    print("    9. 🔄 Update Account Balances")
+    print("   10. ➕ Add New Account")
+    print("   11. ➕ Add New Income Source")
+    print("   12. ➕ Add New Bill")
+    print("   13. ➕ Add New Credit Card")
+    print("   14. ✏️  Edit Account")
+    print("   15. ✏️  Edit Income Source")
+    print("   16. ✏️  Edit Bill")
+    print("   17. ✏️  Edit Credit Card")
     print()
     print("  SETUP:")
-    print("   17. ⚙️  Run Full Setup Wizard (creates new dated config)")
-    print("   18. 📂 Load Previous Config")
+    print("   18. ⚙️  Run Full Setup Wizard (creates new dated config)")
+    print("   19. 📂 Load Previous Config")
     print()
     print("    0. 🚪 Exit")
     print()
@@ -74,10 +78,10 @@ def get_menu_choice():
     """Get user's menu choice."""
     while True:
         try:
-            choice = input("Select option (0-18): ").strip()
-            if choice.isdigit() and 0 <= int(choice) <= 18:
+            choice = input("Select option (0-19): ").strip()
+            if choice.isdigit() and 0 <= int(choice) <= 19:
                 return int(choice)
-            print("⚠️  Please enter a number between 0 and 18")
+            print("⚠️  Please enter a number between 0 and 19")
         except KeyboardInterrupt:
             print("\n")
             return 0
@@ -319,7 +323,7 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
             print("\n👋 Thanks for using Financial Optimization Tool!\n")
             break
 
-        elif choice == 17:
+        elif choice == 18:
             # Run full setup wizard - creates new dated config
             clear_screen()
             dated_config = get_dated_config_name()
@@ -330,7 +334,7 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
                 pause()
             continue
 
-        elif choice == 18:
+        elif choice == 19:
             # Load previous config
             clear_screen()
             print_header("Load Previous Configuration")
@@ -341,32 +345,32 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
             pause()
             continue
 
-        # For options 7 and 9-12, we can add/mark bills without loading full config
-        if choice in [7, 9, 10, 11, 12]:
+        # For options 8 and 10-13, we can add/mark bills without loading full config
+        if choice in [8, 10, 11, 12, 13]:
             clear_screen()
-            if choice == 7:
+            if choice == 8:
                 mark_bill_paid(current_config)
-            elif choice == 9:
-                add_account_to_config(current_config)
             elif choice == 10:
-                add_income_to_config(current_config)
+                add_account_to_config(current_config)
             elif choice == 11:
-                add_bill_to_config(current_config)
+                add_income_to_config(current_config)
             elif choice == 12:
+                add_bill_to_config(current_config)
+            elif choice == 13:
                 add_credit_card_to_config(current_config)
             pause()
             continue
 
-        # For options 13-16, edit existing items (need valid config)
-        if choice in [13, 14, 15, 16]:
+        # For options 14-17, edit existing items (need valid config)
+        if choice in [14, 15, 16, 17]:
             clear_screen()
-            if choice == 13:
+            if choice == 14:
                 edit_account(current_config)
-            elif choice == 14:
-                edit_income(current_config)
             elif choice == 15:
-                edit_bill(current_config)
+                edit_income(current_config)
             elif choice == 16:
+                edit_bill(current_config)
+            elif choice == 17:
                 edit_credit_card(current_config)
             pause()
             continue
@@ -378,8 +382,8 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
         except FileNotFoundError:
             clear_screen()
             print(f"\n❌ Config file not found: {current_config}\n")
-            print("Please run the Full Setup Wizard (option 17) to create your configuration,")
-            print("or Load Previous Config (option 18) to use an existing one.")
+            print("Please run the Full Setup Wizard (option 18) to create your configuration,")
+            print("or Load Previous Config (option 19) to use an existing one.")
             pause()
             continue
         except Exception as e:
@@ -396,8 +400,16 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
             pause()
 
         elif choice == 2:
-            # View 5-Day Action Plan
-            print_upcoming_plan(optimizer, days=5)
+            # View N-Day Action Plan
+            try:
+                days_input = input("\nHow many days to show? (1-30, default 5): ").strip()
+                if days_input and days_input.isdigit():
+                    days = min(max(int(days_input), 1), 30)
+                else:
+                    days = 5
+                print_upcoming_plan(optimizer, days=days)
+            except (ValueError, KeyboardInterrupt):
+                print_upcoming_plan(optimizer, days=5)
             pause()
 
         elif choice == 3:
@@ -424,7 +436,12 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
             print_accounts(optimizer)
             pause()
 
-        elif choice == 8:
+        elif choice == 7:
+            # Financial Advice
+            interactive_advice(optimizer)
+            pause()
+
+        elif choice == 9:
             # Update Account Balances
             interactive_update(current_config)
             pause()
