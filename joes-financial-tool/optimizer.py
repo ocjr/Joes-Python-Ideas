@@ -5,13 +5,22 @@ Financial optimization engine to generate daily tasks and recommendations.
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import List, Optional, Dict
-from models import FinancialConfig, CreditCard, Bill, Income, Account, PayoffStrategy, Frequency
+from models import (
+    FinancialConfig,
+    CreditCard,
+    Bill,
+    Income,
+    Account,
+    PayoffStrategy,
+    Frequency,
+)
 from calendar import monthrange
 
 
 @dataclass
 class CashFlowEvent:
     """Represents a cash flow event (income or expense)."""
+
     date: date
     amount: float  # Positive for income, negative for expense
     description: str
@@ -23,6 +32,7 @@ class CashFlowEvent:
 @dataclass
 class DailyBalance:
     """Track balance for a specific day."""
+
     date: date
     starting_balance: float
     events: List[CashFlowEvent] = field(default_factory=list)
@@ -35,6 +45,7 @@ class DailyBalance:
 @dataclass
 class Task:
     """Represents a concrete financial action."""
+
     date: date
     priority: int  # 1 = highest priority (critical)
     category: str
@@ -55,14 +66,20 @@ class FinancialOptimizer:
         self.config = config
         self.today = date.today()
 
-    def get_next_date(self, day_of_month: int, from_date: Optional[date] = None) -> date:
+    def get_next_date(
+        self, day_of_month: int, from_date: Optional[date] = None
+    ) -> date:
         """Get the next occurrence of a specific day of the month."""
         if from_date is None:
             from_date = self.today
 
         # Try current month
         try:
-            next_date = date(from_date.year, from_date.month, min(day_of_month, monthrange(from_date.year, from_date.month)[1]))
+            next_date = date(
+                from_date.year,
+                from_date.month,
+                min(day_of_month, monthrange(from_date.year, from_date.month)[1]),
+            )
             if next_date >= from_date:
                 return next_date
         except ValueError:
@@ -75,7 +92,11 @@ class FinancialOptimizer:
             next_month = 1
             next_year += 1
 
-        return date(next_year, next_month, min(day_of_month, monthrange(next_year, next_month)[1]))
+        return date(
+            next_year,
+            next_month,
+            min(day_of_month, monthrange(next_year, next_month)[1]),
+        )
 
     def get_next_income_date(self, income: Income) -> date:
         """Calculate next income date after the stored next_date."""
@@ -97,13 +118,19 @@ class FinancialOptimizer:
 
     def calculate_total_available_funds(self) -> float:
         """Calculate total available funds across all accounts."""
-        return sum(max(0, acc.balance - acc.minimum_balance) for acc in self.config.accounts)
+        return sum(
+            max(0, acc.balance - acc.minimum_balance) for acc in self.config.accounts
+        )
 
     def calculate_emergency_fund(self) -> float:
         """Calculate current emergency fund (savings accounts)."""
-        return sum(acc.balance for acc in self.config.accounts if acc.type.value == "savings")
+        return sum(
+            acc.balance for acc in self.config.accounts if acc.type.value == "savings"
+        )
 
-    def calculate_credit_card_spending(self, card_id: str, days_ahead: int = 30) -> float:
+    def calculate_credit_card_spending(
+        self, card_id: str, days_ahead: int = 30
+    ) -> float:
         """Calculate upcoming bills that will be charged to a credit card."""
         total_spending = 0.0
         end_date = self.today + timedelta(days=days_ahead)
@@ -117,7 +144,9 @@ class FinancialOptimizer:
                     total_spending += bill.amount
 
                     if bill.frequency == Frequency.MONTHLY:
-                        next_due = self.get_next_date(bill.due_day, next_due + timedelta(days=1))
+                        next_due = self.get_next_date(
+                            bill.due_day, next_due + timedelta(days=1)
+                        )
                     elif bill.frequency == Frequency.QUARTERLY:
                         # Move forward 3 months
                         next_month = next_due.month + 3
@@ -125,7 +154,11 @@ class FinancialOptimizer:
                         while next_month > 12:
                             next_month -= 12
                             next_year += 1
-                        next_due = date(next_year, next_month, min(bill.due_day, monthrange(next_year, next_month)[1]))
+                        next_due = date(
+                            next_year,
+                            next_month,
+                            min(bill.due_day, monthrange(next_year, next_month)[1]),
+                        )
                     elif bill.frequency == Frequency.ANNUAL:
                         next_due = next_due.replace(year=next_due.year + 1)
                     else:
@@ -146,10 +179,20 @@ class FinancialOptimizer:
                 upcoming.append((next_due, bill))
 
                 if bill.frequency == Frequency.MONTHLY:
-                    next_due = self.get_next_date(bill.due_day, next_due + timedelta(days=1))
+                    next_due = self.get_next_date(
+                        bill.due_day, next_due + timedelta(days=1)
+                    )
                 elif bill.frequency == Frequency.QUARTERLY:
-                    next_due = next_due.replace(month=next_due.month + 3 if next_due.month <= 9 else next_due.month - 9,
-                                               year=next_due.year if next_due.month <= 9 else next_due.year + 1)
+                    next_due = next_due.replace(
+                        month=(
+                            next_due.month + 3
+                            if next_due.month <= 9
+                            else next_due.month - 9
+                        ),
+                        year=(
+                            next_due.year if next_due.month <= 9 else next_due.year + 1
+                        ),
+                    )
                 elif bill.frequency == Frequency.ANNUAL:
                     next_due = next_due.replace(year=next_due.year + 1)
                 else:
@@ -167,11 +210,16 @@ class FinancialOptimizer:
 
             while next_date <= end_date:
                 upcoming.append((next_date, inc))
-                next_date = self.get_next_income_date(Income(
-                    id=inc.id, source=inc.source, amount=inc.amount,
-                    frequency=inc.frequency, next_date=next_date,
-                    deposit_account=inc.deposit_account
-                ))
+                next_date = self.get_next_income_date(
+                    Income(
+                        id=inc.id,
+                        source=inc.source,
+                        amount=inc.amount,
+                        frequency=inc.frequency,
+                        next_date=next_date,
+                        deposit_account=inc.deposit_account,
+                    )
+                )
 
         return sorted(upcoming, key=lambda x: x[0])
 
@@ -187,9 +235,15 @@ class FinancialOptimizer:
             return sorted(cards_with_balance, key=lambda x: x.balance)
         else:  # BALANCED
             # Balance between APR and balance
-            return sorted(cards_with_balance, key=lambda x: (x.apr * 0.5 + (x.balance / 10000) * 0.5), reverse=True)
+            return sorted(
+                cards_with_balance,
+                key=lambda x: (x.apr * 0.5 + (x.balance / 10000) * 0.5),
+                reverse=True,
+            )
 
-    def build_cash_flow_timeline(self, days_ahead: int = 14) -> Dict[date, DailyBalance]:
+    def build_cash_flow_timeline(
+        self, days_ahead: int = 14
+    ) -> Dict[date, DailyBalance]:
         """Build a day-by-day cash flow projection."""
         timeline = {}
         current_balance = sum(acc.balance for acc in self.config.accounts)
@@ -205,14 +259,16 @@ class FinancialOptimizer:
             # Add income events
             for inc_date, inc in self.get_upcoming_income(days_ahead=days_ahead):
                 if inc_date == current_date:
-                    daily.events.append(CashFlowEvent(
-                        date=current_date,
-                        amount=inc.amount,
-                        description=f"Income: {inc.source}",
-                        category="income",
-                        required=False,
-                        account_id=inc.deposit_account
-                    ))
+                    daily.events.append(
+                        CashFlowEvent(
+                            date=current_date,
+                            amount=inc.amount,
+                            description=f"Income: {inc.source}",
+                            category="income",
+                            required=False,
+                            account_id=inc.deposit_account,
+                        )
+                    )
 
             # Add bill payments (only those paid from checking/savings, not credit)
             for bill_date, bill in self.get_upcoming_bills(days_ahead=days_ahead):
@@ -222,28 +278,32 @@ class FinancialOptimizer:
                         continue
 
                     # Only deduct from cash flow if paid from checking/savings
-                    daily.events.append(CashFlowEvent(
-                        date=current_date,
-                        amount=-bill.amount,
-                        description=f"Bill: {bill.name}{'[AUTO]' if bill.autopay else ''}",
-                        category="bill",
-                        required=True,
-                        account_id=bill.payment_account
-                    ))
+                    daily.events.append(
+                        CashFlowEvent(
+                            date=current_date,
+                            amount=-bill.amount,
+                            description=f"Bill: {bill.name}{'[AUTO]' if bill.autopay else ''}",
+                            category="bill",
+                            required=True,
+                            account_id=bill.payment_account,
+                        )
+                    )
 
             # Add credit card minimum payments
             for cc in self.config.credit_cards:
                 if cc.balance > 0:
                     cc_due = self.get_next_date(cc.due_day)
                     if cc_due == current_date:
-                        daily.events.append(CashFlowEvent(
-                            date=current_date,
-                            amount=-cc.minimum_payment,
-                            description=f"CC Min Payment: {cc.name}",
-                            category="cc_minimum",
-                            required=True,
-                            account_id=cc.payment_account
-                        ))
+                        daily.events.append(
+                            CashFlowEvent(
+                                date=current_date,
+                                amount=-cc.minimum_payment,
+                                description=f"CC Min Payment: {cc.name}",
+                                category="cc_minimum",
+                                required=True,
+                                account_id=cc.payment_account,
+                            )
+                        )
 
             daily.calculate_ending()
             current_balance = daily.ending_balance
@@ -260,11 +320,15 @@ class FinancialOptimizer:
         min_balance_required = sum(acc.minimum_balance for acc in self.config.accounts)
 
         # Current available (today)
-        current_available = sum(acc.balance - acc.minimum_balance for acc in self.config.accounts)
+        current_available = sum(
+            acc.balance - acc.minimum_balance for acc in self.config.accounts
+        )
 
         # Safe to spend = current available - buffer for upcoming expenses
         # We need to ensure we don't go below minimum at any point
-        safety_buffer = max(0, min_balance_required - min_future_balance) + 200  # Extra $200 buffer for safety
+        safety_buffer = (
+            max(0, min_balance_required - min_future_balance) + 200
+        )  # Extra $200 buffer for safety
         safe_amount = max(0, current_available - safety_buffer)
 
         # Don't recommend any extra payments if we don't have enough cushion
@@ -281,7 +345,7 @@ class FinancialOptimizer:
             needed = self.config.settings.emergency_fund_target - emergency_fund
             emergency_payment = min(remaining * 0.3, needed)  # 30% max to emergency
             if emergency_payment > 10:  # Only if meaningful amount
-                payments['emergency_fund'] = emergency_payment
+                payments["emergency_fund"] = emergency_payment
                 remaining -= emergency_payment
 
         # Priority 2: Extra credit card payments
@@ -316,17 +380,23 @@ class FinancialOptimizer:
         today_balance = timeline[target_date]
 
         # Calculate current spendable cash
-        current_available = sum(acc.balance - acc.minimum_balance for acc in self.config.accounts)
+        current_available = sum(
+            acc.balance - acc.minimum_balance for acc in self.config.accounts
+        )
 
         # CRITICAL: Check if we're in trouble
-        if today_balance.ending_balance < sum(acc.minimum_balance for acc in self.config.accounts):
-            tasks.append(Task(
-                date=target_date,
-                priority=1,
-                category="⚠️  URGENT",
-                description=f"WARNING: Projected to go below minimum balance. Current available: ${current_available:.2f}",
-                action="review"
-            ))
+        if today_balance.ending_balance < sum(
+            acc.minimum_balance for acc in self.config.accounts
+        ):
+            tasks.append(
+                Task(
+                    date=target_date,
+                    priority=1,
+                    category="⚠️  URGENT",
+                    description=f"WARNING: Projected to go below minimum balance. Current available: ${current_available:.2f}",
+                    action="review",
+                )
+            )
 
         # Find the NEXT credit card due date (earliest)
         next_cc_due_date = None
@@ -352,7 +422,7 @@ class FinancialOptimizer:
         emergency_fund_payment = 0
         if cards_due_today and target_date == next_cc_due_date:
             safe_payments = self.calculate_safe_payment_amount()
-            emergency_fund_payment = safe_payments.get('emergency_fund', 0)
+            emergency_fund_payment = safe_payments.get("emergency_fund", 0)
 
         # Priority 1: Required payments TODAY (combine CC min + extra)
         for event in today_balance.events:
@@ -372,54 +442,62 @@ class FinancialOptimizer:
                         else:
                             description = f"Pay ${total_payment:,.2f} to {cc.name} (minimum payment)"
 
-                        tasks.append(Task(
-                            date=target_date,
-                            priority=1,
-                            category="💳 PAY",
-                            description=description,
-                            amount=total_payment,
-                            account_id=event.account_id,
-                            action="pay"
-                        ))
+                        tasks.append(
+                            Task(
+                                date=target_date,
+                                priority=1,
+                                category="💳 PAY",
+                                description=description,
+                                amount=total_payment,
+                                account_id=event.account_id,
+                                action="pay",
+                            )
+                        )
                         is_cc_payment = True
                         break
 
                 # If not a CC payment, add as regular required payment
                 if not is_cc_payment:
-                    tasks.append(Task(
-                        date=target_date,
-                        priority=1,
-                        category="💳 PAY",
-                        description=event.description.replace("Bill: ", ""),
-                        amount=-event.amount,
-                        account_id=event.account_id,
-                        action="pay"
-                    ))
+                    tasks.append(
+                        Task(
+                            date=target_date,
+                            priority=1,
+                            category="💳 PAY",
+                            description=event.description.replace("Bill: ", ""),
+                            amount=-event.amount,
+                            account_id=event.account_id,
+                            action="pay",
+                        )
+                    )
 
         # Priority 2: Emergency fund (only on CC due dates)
         if emergency_fund_payment > 0:
-            tasks.append(Task(
-                date=target_date,
-                priority=2,
-                category="🏦 SAVE",
-                description=f"Transfer ${emergency_fund_payment:,.2f} to emergency fund",
-                amount=emergency_fund_payment,
-                action="transfer"
-            ))
+            tasks.append(
+                Task(
+                    date=target_date,
+                    priority=2,
+                    category="🏦 SAVE",
+                    description=f"Transfer ${emergency_fund_payment:,.2f} to emergency fund",
+                    amount=emergency_fund_payment,
+                    action="transfer",
+                )
+            )
 
         # Priority 3: Income expected today
         for event in today_balance.events:
             if event.amount > 0:
                 source = event.description.replace("Income: ", "")
-                tasks.append(Task(
-                    date=target_date,
-                    priority=3,
-                    category="💵 INCOME",
-                    description=f"${event.amount:,.2f} from {source}",
-                    amount=event.amount,
-                    account_id=event.account_id,
-                    action="wait"
-                ))
+                tasks.append(
+                    Task(
+                        date=target_date,
+                        priority=3,
+                        category="💵 INCOME",
+                        description=f"${event.amount:,.2f} from {source}",
+                        amount=event.amount,
+                        account_id=event.account_id,
+                        action="wait",
+                    )
+                )
 
         # Priority 5: Show what's coming in next 7 days
         upcoming_required = []
@@ -432,13 +510,15 @@ class FinancialOptimizer:
 
         if upcoming_required:
             total_upcoming = sum(-event.amount for _, event in upcoming_required)
-            tasks.append(Task(
-                date=target_date,
-                priority=5,
-                category="📅 UPCOMING",
-                description=f"${total_upcoming:.2f} in required payments over next 7 days ({len(upcoming_required)} items)",
-                action="info"
-            ))
+            tasks.append(
+                Task(
+                    date=target_date,
+                    priority=5,
+                    category="📅 UPCOMING",
+                    description=f"${total_upcoming:.2f} in required payments over next 7 days ({len(upcoming_required)} items)",
+                    action="info",
+                )
+            )
 
         return sorted(tasks, key=lambda x: x.priority)
 
@@ -449,26 +529,32 @@ class FinancialOptimizer:
     def generate_monthly_action_plan(self) -> dict:
         """Generate action-focused monthly financial plan."""
         # Calculate checking vs savings totals
-        checking_total = sum(acc.balance for acc in self.config.accounts if acc.type.value == "checking")
-        savings_total = sum(acc.balance for acc in self.config.accounts if acc.type.value == "savings")
-        cash_total = sum(acc.balance for acc in self.config.accounts if acc.type.value == "cash")
+        checking_total = sum(
+            acc.balance for acc in self.config.accounts if acc.type.value == "checking"
+        )
+        savings_total = sum(
+            acc.balance for acc in self.config.accounts if acc.type.value == "savings"
+        )
+        cash_total = sum(
+            acc.balance for acc in self.config.accounts if acc.type.value == "cash"
+        )
 
         # Get monthly income
         monthly_income = []
         for inc_date, inc in self.get_upcoming_income(days_ahead=30):
-            monthly_income.append({
-                'date': inc_date,
-                'source': inc.source,
-                'amount': inc.amount
-            })
-        total_income = sum(inc['amount'] for inc in monthly_income)
+            monthly_income.append(
+                {"date": inc_date, "source": inc.source, "amount": inc.amount}
+            )
+        total_income = sum(inc["amount"] for inc in monthly_income)
 
         # Calculate credit card actions with spending
         cc_actions = []
         total_cc_payments = 0
         for cc in self.config.credit_cards:
             cc_due = self.get_next_date(cc.due_day)
-            upcoming_spending = self.calculate_credit_card_spending(cc.id, days_ahead=30)
+            upcoming_spending = self.calculate_credit_card_spending(
+                cc.id, days_ahead=30
+            )
 
             # Recommended payment = minimum + any extra we can afford + upcoming spending
             # This prevents new debt from accumulating
@@ -480,28 +566,36 @@ class FinancialOptimizer:
                 recommended_payment += safe_extra
 
             if cc.balance > 0 or upcoming_spending > 0:
-                cc_actions.append({
-                    'card_name': cc.name,
-                    'due_date': cc_due,
-                    'current_balance': cc.balance,
-                    'upcoming_spending': upcoming_spending,
-                    'minimum_payment': cc.minimum_payment,
-                    'recommended_payment': min(recommended_payment, cc.balance + upcoming_spending),
-                    'apr': cc.apr
-                })
-                total_cc_payments += min(recommended_payment, cc.balance + upcoming_spending)
+                cc_actions.append(
+                    {
+                        "card_name": cc.name,
+                        "due_date": cc_due,
+                        "current_balance": cc.balance,
+                        "upcoming_spending": upcoming_spending,
+                        "minimum_payment": cc.minimum_payment,
+                        "recommended_payment": min(
+                            recommended_payment, cc.balance + upcoming_spending
+                        ),
+                        "apr": cc.apr,
+                    }
+                )
+                total_cc_payments += min(
+                    recommended_payment, cc.balance + upcoming_spending
+                )
 
         # Get bills paid from checking
         checking_bills = []
         total_bill_payments = 0
         for bill_date, bill in self.get_upcoming_bills(days_ahead=30):
             if not bill.paid_by_credit:
-                checking_bills.append({
-                    'date': bill_date,
-                    'name': bill.name,
-                    'amount': bill.amount,
-                    'autopay': bill.autopay
-                })
+                checking_bills.append(
+                    {
+                        "date": bill_date,
+                        "name": bill.name,
+                        "amount": bill.amount,
+                        "autopay": bill.autopay,
+                    }
+                )
                 total_bill_payments += bill.amount
 
         # Emergency fund status
@@ -509,18 +603,20 @@ class FinancialOptimizer:
         emergency_target = self.config.settings.emergency_fund_target
 
         return {
-            'current_date': self.today,
-            'checking_balance': checking_total,
-            'savings_balance': savings_total,
-            'cash_balance': cash_total,
-            'total_debt': sum(cc.balance for cc in self.config.credit_cards),
-            'emergency_fund': emergency_fund,
-            'emergency_target': emergency_target,
-            'emergency_pct': (emergency_fund / emergency_target * 100) if emergency_target > 0 else 0,
-            'monthly_income': monthly_income,
-            'total_income': total_income,
-            'cc_actions': sorted(cc_actions, key=lambda x: x['due_date']),
-            'checking_bills': sorted(checking_bills, key=lambda x: x['date']),
-            'total_outflows': total_cc_payments + total_bill_payments,
-            'net_monthly': total_income - (total_cc_payments + total_bill_payments)
+            "current_date": self.today,
+            "checking_balance": checking_total,
+            "savings_balance": savings_total,
+            "cash_balance": cash_total,
+            "total_debt": sum(cc.balance for cc in self.config.credit_cards),
+            "emergency_fund": emergency_fund,
+            "emergency_target": emergency_target,
+            "emergency_pct": (
+                (emergency_fund / emergency_target * 100) if emergency_target > 0 else 0
+            ),
+            "monthly_income": monthly_income,
+            "total_income": total_income,
+            "cc_actions": sorted(cc_actions, key=lambda x: x["due_date"]),
+            "checking_bills": sorted(checking_bills, key=lambda x: x["date"]),
+            "total_outflows": total_cc_payments + total_bill_payments,
+            "net_monthly": total_income - (total_cc_payments + total_bill_payments),
         }

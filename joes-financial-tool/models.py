@@ -25,13 +25,14 @@ class Frequency(Enum):
 
 class PayoffStrategy(Enum):
     AVALANCHE = "avalanche"  # Highest interest first
-    SNOWBALL = "snowball"    # Lowest balance first
-    BALANCED = "balanced"     # Mix of both
+    SNOWBALL = "snowball"  # Lowest balance first
+    BALANCED = "balanced"  # Mix of both
 
 
 @dataclass
 class Account:
     """Represents a bank account."""
+
     id: str
     name: str
     type: AccountType
@@ -46,6 +47,7 @@ class Account:
 @dataclass
 class IncomeSplit:
     """Represents how to split income across accounts."""
+
     account_id: str
     amount: Optional[float] = None  # None means "remainder"
 
@@ -57,6 +59,7 @@ class IncomeSplit:
 @dataclass
 class Income:
     """Represents an income source with optional account splitting."""
+
     id: str
     source: str
     amount: float
@@ -89,6 +92,7 @@ class Income:
 @dataclass
 class Bill:
     """Represents a recurring bill."""
+
     id: str
     name: str
     amount: float
@@ -115,8 +119,10 @@ class Bill:
 
         # For monthly bills, check if we've paid this month
         if self.frequency == Frequency.MONTHLY:
-            return (self.last_paid.year == check_date.year and
-                    self.last_paid.month == check_date.month)
+            return (
+                self.last_paid.year == check_date.year
+                and self.last_paid.month == check_date.month
+            )
 
         # For other frequencies, check if last_paid is on or after the check_date
         return self.last_paid >= check_date
@@ -125,6 +131,7 @@ class Bill:
 @dataclass
 class CreditCard:
     """Represents a credit card account."""
+
     id: str
     name: str
     balance: float
@@ -139,7 +146,9 @@ class CreditCard:
         if not 1 <= self.due_day <= 31:
             raise ValueError(f"due_day must be between 1 and 31, got {self.due_day}")
         if self.statement_day and not 1 <= self.statement_day <= 31:
-            raise ValueError(f"statement_day must be between 1 and 31, got {self.statement_day}")
+            raise ValueError(
+                f"statement_day must be between 1 and 31, got {self.statement_day}"
+            )
 
     @property
     def utilization(self) -> float:
@@ -155,6 +164,7 @@ class CreditCard:
 @dataclass
 class Settings:
     """Optimization settings."""
+
     emergency_fund_target: float = 1000.0
     planning_horizon_days: int = 30
     priority: PayoffStrategy = PayoffStrategy.AVALANCHE
@@ -167,6 +177,7 @@ class Settings:
 @dataclass
 class FinancialConfig:
     """Complete financial configuration."""
+
     accounts: list[Account]
     income: list[Income]
     bills: list[Bill]

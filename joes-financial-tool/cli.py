@@ -11,23 +11,26 @@ from datetime import date, timedelta
 from config_loader import load_config, save_config
 from optimizer import FinancialOptimizer
 from setup_wizard import (
-    run_setup_wizard, add_account_to_config, add_income_to_config,
-    add_bill_to_config, add_credit_card_to_config
+    run_setup_wizard,
+    add_account_to_config,
+    add_income_to_config,
+    add_bill_to_config,
+    add_credit_card_to_config,
 )
-from edit_wizard import (
-    edit_account, edit_income, edit_bill, edit_credit_card
-)
+from edit_wizard import edit_account, edit_income, edit_bill, edit_credit_card
 from bill_tracker import mark_bill_paid
 from financial_advisor import interactive_advice
 from config_manager import (
-    get_dated_config_name, select_config_interactive, list_config_files,
-    get_most_recent_config
+    get_dated_config_name,
+    select_config_interactive,
+    list_config_files,
+    get_most_recent_config,
 )
 
 
 def clear_screen():
     """Clear the terminal screen."""
-    os.system('clear' if os.name == 'posix' else 'cls')
+    os.system("clear" if os.name == "posix" else "cls")
 
 
 def print_header(title: str):
@@ -102,7 +105,9 @@ def print_tasks(optimizer: FinancialOptimizer, target_date: date = None):
     print_header(f"Today's Actions - {target_date.strftime('%A, %B %d, %Y')}")
 
     # Show current cash position
-    available = sum(acc.balance - acc.minimum_balance for acc in optimizer.config.accounts)
+    available = sum(
+        acc.balance - acc.minimum_balance for acc in optimizer.config.accounts
+    )
     total = sum(acc.balance for acc in optimizer.config.accounts)
     print(f"💵 Cash Position: ${total:,.2f} total | ${available:,.2f} available\n")
 
@@ -142,7 +147,11 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
             continue
 
         day_data = timeline[current_date]
-        day_label = "TODAY" if day_offset == 0 else f"+{day_offset} day{'s' if day_offset > 1 else ''}"
+        day_label = (
+            "TODAY"
+            if day_offset == 0
+            else f"+{day_offset} day{'s' if day_offset > 1 else ''}"
+        )
 
         # Get required events for this day
         required_events = [e for e in day_data.events if e.required and e.amount < 0]
@@ -163,7 +172,7 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
         emergency_fund_payment = 0
         if cards_due_today and current_date == next_cc_due_date:
             safe_payments = optimizer.calculate_safe_payment_amount()
-            emergency_fund_payment = safe_payments.get('emergency_fund', 0)
+            emergency_fund_payment = safe_payments.get("emergency_fund", 0)
 
         # Show this day if there's anything happening
         if required_events or income_events or cards_due_today:
@@ -185,16 +194,24 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
 
                         if extra_payment > 0:
                             daily_savings = (extra_payment * cc.apr) / 365
-                            print(f"   💳 PAY: ${total_payment:,.2f} to {cc.name} (${min_payment:,.2f} min + ${extra_payment:,.2f} extra, saves ${daily_savings:.2f}/day)")
+                            print(
+                                f"   💳 PAY: ${total_payment:,.2f} to {cc.name} (${min_payment:,.2f} min + ${extra_payment:,.2f} extra, saves ${daily_savings:.2f}/day)"
+                            )
                         else:
-                            print(f"   💳 PAY: ${total_payment:,.2f} to {cc.name} (minimum payment)")
+                            print(
+                                f"   💳 PAY: ${total_payment:,.2f} to {cc.name} (minimum payment)"
+                            )
 
                         is_cc_payment = True
                         break
 
                 # Not a CC payment, show as regular bill
                 if not is_cc_payment:
-                    description = event.description.replace("Bill: ", "").replace("[AUTO]", "").strip()
+                    description = (
+                        event.description.replace("Bill: ", "")
+                        .replace("[AUTO]", "")
+                        .strip()
+                    )
                     autopay = "[AUTO]" if "[AUTO]" in event.description else ""
                     print(f"   💳 PAY: ${-event.amount:,.2f} - {description} {autopay}")
 
@@ -245,7 +262,7 @@ def print_cash_flow_forecast(optimizer: FinancialOptimizer):
         emergency_fund_payment = 0
         if cards_due_today and day_date == next_cc_due_date:
             safe_payments = optimizer.calculate_safe_payment_amount()
-            emergency_fund_payment = safe_payments.get('emergency_fund', 0)
+            emergency_fund_payment = safe_payments.get("emergency_fund", 0)
 
         # Calculate total extra payments for this day
         day_extra_total = 0
@@ -278,7 +295,9 @@ def print_cash_flow_forecast(optimizer: FinancialOptimizer):
         else:
             status = "✓ OK"
 
-        print(f"{day_str:<12} ${adjusted_starting:>9,.2f} {events_str:>8} ${adjusted_ending:>9,.2f}  {status}")
+        print(
+            f"{day_str:<12} ${adjusted_starting:>9,.2f} {events_str:>8} ${adjusted_ending:>9,.2f}  {status}"
+        )
 
         # Show events for this day
         for event in day_data.events:
@@ -291,16 +310,22 @@ def print_cash_flow_forecast(optimizer: FinancialOptimizer):
                     total_payment = min_payment + extra_payment
 
                     if extra_payment > 0:
-                        print(f"             └─ $-{total_payment:,.2f} Pay {cc.name} (${min_payment:,.2f} min + ${extra_payment:,.2f} extra)")
+                        print(
+                            f"             └─ $-{total_payment:,.2f} Pay {cc.name} (${min_payment:,.2f} min + ${extra_payment:,.2f} extra)"
+                        )
                     else:
-                        print(f"             └─ $-{total_payment:,.2f} {event.description}")
+                        print(
+                            f"             └─ $-{total_payment:,.2f} {event.description}"
+                        )
 
                     is_cc_payment = True
                     break
 
             if not is_cc_payment:
                 symbol = "+" if event.amount > 0 else ""
-                description = event.description.replace("Income: ", "").replace("Bill: ", "")
+                description = event.description.replace("Income: ", "").replace(
+                    "Bill: ", ""
+                )
                 print(f"             └─ {symbol}${event.amount:,.2f} {description}")
 
         # Show emergency fund if applicable
@@ -319,8 +344,10 @@ def print_summary(optimizer: FinancialOptimizer):
     print(f"📅 As of: {plan['current_date'].strftime('%B %d, %Y')}\n")
 
     # Current total balance
-    total_assets = plan['checking_balance'] + plan['savings_balance'] + plan['cash_balance']
-    net_worth = total_assets - plan['total_debt']
+    total_assets = (
+        plan["checking_balance"] + plan["savings_balance"] + plan["cash_balance"]
+    )
+    net_worth = total_assets - plan["total_debt"]
 
     print("💰 BALANCE TODAY:")
     print(f"   Total Assets: ${total_assets:,.2f}")
@@ -328,24 +355,26 @@ def print_summary(optimizer: FinancialOptimizer):
     print(f"   Net Worth:    ${net_worth:,.2f}\n")
 
     # Emergency fund
-    status = "✓" if plan['emergency_pct'] >= 100 else "⚠️ "
-    print(f"🏦 Emergency Fund: ${plan['emergency_fund']:,.2f} / ${plan['emergency_target']:,.2f} ({status} {plan['emergency_pct']:.0f}%)\n")
+    status = "✓" if plan["emergency_pct"] >= 100 else "⚠️ "
+    print(
+        f"🏦 Emergency Fund: ${plan['emergency_fund']:,.2f} / ${plan['emergency_target']:,.2f} ({status} {plan['emergency_pct']:.0f}%)\n"
+    )
 
     # Monthly outlook
     print("📊 MONTHLY OUTLOOK:")
     print(f"   Expected Income:   +${plan['total_income']:,.2f}")
     print(f"   Expected Outflows: -${plan['total_outflows']:,.2f}")
-    net_symbol = "+" if plan['net_monthly'] >= 0 else ""
+    net_symbol = "+" if plan["net_monthly"] >= 0 else ""
     print(f"   Net Cash Flow:     {net_symbol}${plan['net_monthly']:,.2f}\n")
 
     # Projected end of month
-    projected_assets = total_assets + plan['net_monthly']
+    projected_assets = total_assets + plan["net_monthly"]
     # Estimate debt reduction (from extra payments in recommendations)
     debt_reduction = sum(
-        action['recommended_payment'] - action['minimum_payment']
-        for action in plan.get('cc_actions', [])
+        action["recommended_payment"] - action["minimum_payment"]
+        for action in plan.get("cc_actions", [])
     )
-    projected_debt = max(0, plan['total_debt'] - debt_reduction)
+    projected_debt = max(0, plan["total_debt"] - debt_reduction)
     projected_net_worth = projected_assets - projected_debt
 
     print("📈 PROJECTED END OF MONTH:")
@@ -392,7 +421,7 @@ def interactive_update(config_path: str):
         response = input(f"  {acc.name} (current: ${current:,.2f}): $")
         if response.strip():
             try:
-                acc.balance = float(response.replace(',', ''))
+                acc.balance = float(response.replace(",", ""))
                 print(f"    Updated to ${acc.balance:,.2f}")
             except ValueError:
                 print(f"    Invalid input, keeping ${current:,.2f}")
@@ -403,17 +432,19 @@ def interactive_update(config_path: str):
         response = input(f"  {cc.name} balance (current: ${current:,.2f}): $")
         if response.strip():
             try:
-                cc.balance = float(response.replace(',', ''))
+                cc.balance = float(response.replace(",", ""))
                 print(f"    Updated to ${cc.balance:,.2f}")
             except ValueError:
                 print(f"    Invalid input, keeping ${current:,.2f}")
 
         # Optionally update minimum payment
         current_min = cc.minimum_payment
-        response = input(f"  {cc.name} minimum payment (current: ${current_min:,.2f}): $")
+        response = input(
+            f"  {cc.name} minimum payment (current: ${current_min:,.2f}): $"
+        )
         if response.strip():
             try:
-                cc.minimum_payment = float(response.replace(',', ''))
+                cc.minimum_payment = float(response.replace(",", ""))
                 print(f"    Updated to ${cc.minimum_payment:,.2f}")
             except ValueError:
                 print(f"    Invalid input, keeping ${current_min:,.2f}")
@@ -428,7 +459,7 @@ def interactive_update(config_path: str):
         sys.exit(1)
 
 
-def run_interactive_mode(config_path: str = 'financial_config.json'):
+def run_interactive_mode(config_path: str = "financial_config.json"):
     """Run the interactive menu-driven interface."""
 
     # Use the provided config path or default
@@ -503,7 +534,9 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
         except FileNotFoundError:
             clear_screen()
             print(f"\n❌ Config file not found: {current_config}\n")
-            print("Please run the Full Setup Wizard (option 18) to create your configuration,")
+            print(
+                "Please run the Full Setup Wizard (option 18) to create your configuration,"
+            )
             print("or Load Previous Config (option 19) to use an existing one.")
             pause()
             continue
@@ -523,7 +556,9 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
         elif choice == 2:
             # View N-Day Action Plan
             try:
-                days_input = input("\nHow many days to show? (1-30, default 5): ").strip()
+                days_input = input(
+                    "\nHow many days to show? (1-30, default 5): "
+                ).strip()
                 if days_input and days_input.isdigit():
                     days = min(max(int(days_input), 1), 30)
                 else:
@@ -582,7 +617,9 @@ def run_argument_mode(args):
         config = load_config(args.config)
     except FileNotFoundError:
         print(f"❌ Error: Config file not found: {args.config}")
-        print(f"\nCreate a config file named '{args.config}' or specify a different path.")
+        print(
+            f"\nCreate a config file named '{args.config}' or specify a different path."
+        )
         print(f"See 'example_config.json' for a template.")
         print(f"\nRun without arguments for interactive setup wizard.")
         sys.exit(1)
@@ -637,69 +674,75 @@ Examples:
   %(prog)s -t                 # Show today's tasks (quick)
   %(prog)s --all              # Show everything (quick)
   %(prog)s -u                 # Update balances
-        """
+        """,
     )
     parser.add_argument(
-        'config',
+        "config",
         type=str,
-        nargs='?',
-        default='financial_config.json',
-        help='Path to financial configuration JSON file (default: financial_config.json)'
+        nargs="?",
+        default="financial_config.json",
+        help="Path to financial configuration JSON file (default: financial_config.json)",
     )
     parser.add_argument(
-        '-t', '--tasks',
-        action='store_true',
-        help='Show today\'s tasks (argument mode)'
+        "-t", "--tasks", action="store_true", help="Show today's tasks (argument mode)"
     )
     parser.add_argument(
-        '-s', '--summary',
-        action='store_true',
-        help='Show weekly summary (argument mode)'
+        "-s",
+        "--summary",
+        action="store_true",
+        help="Show weekly summary (argument mode)",
     )
     parser.add_argument(
-        '-a', '--accounts',
-        action='store_true',
-        help='Show account details (argument mode)'
+        "-a",
+        "--accounts",
+        action="store_true",
+        help="Show account details (argument mode)",
     )
     parser.add_argument(
-        '-f', '--forecast',
-        action='store_true',
-        help='Show 14-day cash flow forecast (argument mode)'
+        "-f",
+        "--forecast",
+        action="store_true",
+        help="Show 14-day cash flow forecast (argument mode)",
     )
     parser.add_argument(
-        '-u', '--update',
-        action='store_true',
-        help='Update account balances interactively (argument mode)'
+        "-u",
+        "--update",
+        action="store_true",
+        help="Update account balances interactively (argument mode)",
     )
     parser.add_argument(
-        '-d', '--date',
+        "-d",
+        "--date",
         type=str,
-        help='Target date for tasks in YYYY-MM-DD format (argument mode)'
+        help="Target date for tasks in YYYY-MM-DD format (argument mode)",
     )
     parser.add_argument(
-        '--all',
-        action='store_true',
-        help='Show all information (argument mode)'
+        "--all", action="store_true", help="Show all information (argument mode)"
     )
     parser.add_argument(
-        '-i', '--interactive',
-        action='store_true',
-        help='Force interactive menu mode'
+        "-i", "--interactive", action="store_true", help="Force interactive menu mode"
     )
 
     args = parser.parse_args()
 
     # If no config specified, use the most recent one
-    if args.config == 'financial_config.json':
+    if args.config == "financial_config.json":
         most_recent = get_most_recent_config()
         if most_recent and Path(most_recent).exists():
             args.config = most_recent
 
     # Determine mode: interactive vs argument
-    has_arguments = any([
-        args.tasks, args.summary, args.accounts, args.forecast,
-        args.update, args.date, args.all
-    ])
+    has_arguments = any(
+        [
+            args.tasks,
+            args.summary,
+            args.accounts,
+            args.forecast,
+            args.update,
+            args.date,
+            args.all,
+        ]
+    )
 
     if args.interactive or not has_arguments:
         # Interactive menu mode
@@ -709,5 +752,5 @@ Examples:
         run_argument_mode(args)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

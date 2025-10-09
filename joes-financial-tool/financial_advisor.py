@@ -1,25 +1,63 @@
 #!/usr/bin/env python3
 """
 Financial advice and decision support utilities.
+
+This module provides advisory functions to help users make informed financial
+decisions about purchases and debt payments based on cash flow analysis.
 """
 
 from datetime import date, timedelta
+from typing import Any
 from optimizer import FinancialOptimizer
 from setup_wizard import print_header, get_input, get_choice
 
 
-def can_afford_purchase(optimizer: FinancialOptimizer, amount: float, days_out: int = 0) -> dict:
+def can_afford_purchase(
+    optimizer: FinancialOptimizer, amount: float, days_out: int = 0
+) -> dict[str, Any]:
     """
     Check if a purchase is affordable without compromising financial safety.
 
-    Returns:
-        dict with keys: affordable (bool), reason (str), impact (str)
+    Simulates a purchase by analyzing current available funds and 30-day cash flow
+    projections to ensure minimum balance requirements are maintained.
+
+    Parameters
+    ----------
+    optimizer : FinancialOptimizer
+        Configured optimizer with current financial state
+    amount : float
+        Purchase amount in dollars
+    days_out : int, optional
+        Number of days in the future for the purchase (default: 0 for today)
+
+    Returns
+    -------
+    dict[str, Any]
+        Dictionary with keys:
+        - affordable (bool): Whether the purchase is safe
+        - reason (str): Explanation of the decision
+        - impact (str): Detailed impact analysis
+
+    Examples
+    --------
+    >>> result = can_afford_purchase(optimizer, 500.00)
+    >>> print(result['affordable'])
+    True
+    >>> print(result['reason'])
+    Yes, you can afford this purchase.
+
+    Notes
+    -----
+    The function applies a $100 safety buffer above minimum balance requirements
+    to prevent unexpected overdrafts from small fluctuations.
     """
     # Get cash flow timeline
     timeline = optimizer.build_cash_flow_timeline(days_ahead=30)
 
     # Current available
-    current_available = sum(acc.balance - acc.minimum_balance for acc in optimizer.config.accounts)
+    current_available = sum(
+        acc.balance - acc.minimum_balance for acc in optimizer.config.accounts
+    )
     min_balance_required = sum(acc.minimum_balance for acc in optimizer.config.accounts)
 
     purchase_date = optimizer.today + timedelta(days=days_out)
@@ -27,9 +65,9 @@ def can_afford_purchase(optimizer: FinancialOptimizer, amount: float, days_out: 
     # Check if we even have the money right now
     if amount > current_available:
         return {
-            'affordable': False,
-            'reason': f'Insufficient funds. You have ${current_available:.2f} available but need ${amount:.2f}.',
-            'impact': f'Short by ${amount - current_available:.2f}'
+            "affordable": False,
+            "reason": f"Insufficient funds. You have ${current_available:.2f} available but need ${amount:.2f}.",
+            "impact": f"Short by ${amount - current_available:.2f}",
         }
 
     # Simulate the purchase by reducing balance
@@ -38,13 +76,13 @@ def can_afford_purchase(optimizer: FinancialOptimizer, amount: float, days_out: 
     # Check if we'd go below minimum
     if simulated_balance < 0:
         return {
-            'affordable': False,
-            'reason': f'This would put you below minimum balance requirements.',
-            'impact': f'Would be ${abs(simulated_balance):.2f} below minimums'
+            "affordable": False,
+            "reason": "This would put you below minimum balance requirements.",
+            "impact": f"Would be ${abs(simulated_balance):.2f} below minimums",
         }
 
     # Check cash flow for next 30 days after purchase
-    min_future_balance = float('inf')
+    min_future_balance = float("inf")
     critical_date = None
 
     for day_date, day_data in timeline.items():
@@ -59,28 +97,61 @@ def can_afford_purchase(optimizer: FinancialOptimizer, amount: float, days_out: 
     buffer = 100  # $100 safety buffer
     if min_future_balance < min_balance_required + buffer:
         return {
-            'affordable': False,
-            'reason': f'This would create cash flow problems on {critical_date.strftime("%b %d")}.',
-            'impact': f'Would leave only ${min_future_balance:.2f} (minimum needed: ${min_balance_required + buffer:.2f})'
+            "affordable": False,
+            "reason": f'This would create cash flow problems on {critical_date.strftime("%b %d")}.',
+            "impact": f"Would leave only ${min_future_balance:.2f} (minimum needed: ${min_balance_required + buffer:.2f})",
         }
 
     # It's affordable!
     cushion = min_future_balance - min_balance_required
     return {
-        'affordable': True,
-        'reason': f'Yes, you can afford this purchase.',
-        'impact': f'After purchase, you\'ll have ${cushion:.2f} cushion above minimums. Lowest balance will be on {critical_date.strftime("%b %d")}.'
+        "affordable": True,
+        "reason": "Yes, you can afford this purchase.",
+        "impact": f"After purchase, you'll have ${cushion:.2f} cushion above minimums. Lowest balance will be on {critical_date.strftime('%b %d')}.",
     }
 
 
-def recommend_lump_sum_payment(optimizer: FinancialOptimizer, amount: float) -> list:
+def recommend_lump_sum_payment(
+    optimizer: FinancialOptimizer, amount: float
+) -> list[dict[str, Any]]:
     """
     Recommend how to allocate a lump sum payment across debts.
 
-    Returns:
-        List of dicts with keys: target (str), amount (float), reason (str)
+    Analyzes the current financial state and debt payoff strategy to provide
+    optimal allocation recommendations. Prioritizes emergency fund building
+    before debt payments.
+
+    Parameters
+    ----------
+    optimizer : FinancialOptimizer
+        Configured optimizer with current financial state and strategy settings
+    amount : float
+        Lump sum amount available to allocate
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        List of allocation recommendations, each containing:
+        - target (str): Destination for funds (e.g., "Emergency Fund", card name)
+        - amount (float): Amount to allocate
+        - reason (str): Explanation for the allocation
+
+    Examples
+    --------
+    >>> recommendations = recommend_lump_sum_payment(optimizer, 1000.00)
+    >>> for rec in recommendations:
+    ...     print(f"{rec['target']}: ${rec['amount']:.2f}")
+    Emergency Fund: $500.00
+    High APR Card (Credit Card): $500.00
+
+    Notes
+    -----
+    Allocation priority:
+    1. Emergency fund up to target amount
+    2. Credit cards based on selected strategy (Avalanche/Snowball/Balanced)
+    3. Additional savings if no debts remain
     """
-    recommendations = []
+    recommendations: list[dict[str, Any]] = []
     remaining = amount
 
     # First check if we should build emergency fund
@@ -90,11 +161,13 @@ def recommend_lump_sum_payment(optimizer: FinancialOptimizer, amount: float) -> 
     if emergency_fund < emergency_target:
         shortage = emergency_target - emergency_fund
         emergency_allocation = min(remaining, shortage)
-        recommendations.append({
-            'target': 'Emergency Fund',
-            'amount': emergency_allocation,
-            'reason': f'Build emergency fund to target (currently ${emergency_fund:.2f} / ${emergency_target:.2f})'
-        })
+        recommendations.append(
+            {
+                "target": "Emergency Fund",
+                "amount": emergency_allocation,
+                "reason": f"Build emergency fund to target (currently ${emergency_fund:.2f} / ${emergency_target:.2f})",
+            }
+        )
         remaining -= emergency_allocation
 
     if remaining <= 0:
@@ -117,26 +190,48 @@ def recommend_lump_sum_payment(optimizer: FinancialOptimizer, amount: float) -> 
             monthly_savings = annual_savings / 12
 
             strategy_name = strategy.value.title()
-            recommendations.append({
-                'target': f'{cc.name} (Credit Card)',
-                'amount': payment,
-                'reason': f'{strategy_name} strategy - APR: {cc.apr*100:.1f}%, saves ${monthly_savings:.2f}/month in interest'
-            })
+            recommendations.append(
+                {
+                    "target": f"{cc.name} (Credit Card)",
+                    "amount": payment,
+                    "reason": f"{strategy_name} strategy - APR: {cc.apr*100:.1f}%, saves ${monthly_savings:.2f}/month in interest",
+                }
+            )
             remaining -= payment
 
     # If there's still money left, suggest savings
     if remaining > 0:
-        recommendations.append({
-            'target': 'Additional Savings',
-            'amount': remaining,
-            'reason': 'No high-interest debt remaining. Build additional savings.'
-        })
+        recommendations.append(
+            {
+                "target": "Additional Savings",
+                "amount": remaining,
+                "reason": "No high-interest debt remaining. Build additional savings.",
+            }
+        )
 
     return recommendations
 
 
-def interactive_advice(optimizer: FinancialOptimizer):
-    """Interactive financial advice menu."""
+def interactive_advice(optimizer: FinancialOptimizer) -> None:
+    """
+    Interactive financial advice menu.
+
+    Presents a menu of advisory options and handles user interaction for
+    purchase affordability checks and lump sum payment recommendations.
+
+    Parameters
+    ----------
+    optimizer : FinancialOptimizer
+        Configured optimizer with current financial state
+
+    Notes
+    -----
+    Available advice options:
+    1. Can I afford a purchase? - Checks if a specific purchase is safe
+    2. How should I allocate a lump sum? - Provides debt payoff recommendations
+
+    The function handles all user input and displays results in a formatted manner.
+    """
     print_header("💡 Financial Advice")
 
     print("What would you like advice on?\n")

@@ -1,119 +1,206 @@
+#!/usr/bin/env python3
 """
 Configuration loader for financial data.
+
+This module handles loading and saving financial configurations from/to JSON files.
+It provides serialization and deserialization of all financial data models.
 """
 
 import json
 from pathlib import Path
 from typing import Union
 from models import (
-    FinancialConfig, Account, Income, Bill, CreditCard, Settings,
-    AccountType, Frequency, PayoffStrategy
+    FinancialConfig,
+    Account,
+    Income,
+    Bill,
+    CreditCard,
+    Settings,
 )
 
 
 def load_config(config_path: Union[str, Path]) -> FinancialConfig:
-    """Load financial configuration from JSON file."""
+    """
+    Load financial configuration from JSON file.
+
+    Parses a JSON configuration file and constructs a complete FinancialConfig
+    object with all accounts, income sources, bills, credit cards, and settings.
+
+    Parameters
+    ----------
+    config_path : Union[str, Path]
+        Path to the JSON configuration file
+
+    Returns
+    -------
+    FinancialConfig
+        Complete financial configuration object with all entities loaded
+
+    Raises
+    ------
+    FileNotFoundError
+        If the configuration file does not exist
+    json.JSONDecodeError
+        If the file contains invalid JSON
+    KeyError
+        If required fields are missing from the configuration
+    ValueError
+        If configuration values are invalid (e.g., invalid enums, dates)
+
+    Examples
+    --------
+    >>> config = load_config("financial_config.json")
+    >>> print(f"Loaded {len(config.accounts)} accounts")
+    Loaded 3 accounts
+
+    Notes
+    -----
+    The function automatically converts string representations of enums and dates
+    to their proper types through the model __post_init__ methods.
+    """
     config_path = Path(config_path)
 
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
-    with open(config_path, 'r') as f:
-        data = json.load(f)
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        raise json.JSONDecodeError(
+            f"Invalid JSON in config file: {e.msg}", e.doc, e.pos
+        )
 
-    # Parse accounts
-    accounts = [Account(**acc) for acc in data.get('accounts', [])]
+    try:
+        # Parse accounts
+        accounts = [Account(**acc) for acc in data.get("accounts", [])]
 
-    # Parse income sources
-    income = [Income(**inc) for inc in data.get('income', [])]
+        # Parse income sources
+        income = [Income(**inc) for inc in data.get("income", [])]
 
-    # Parse bills
-    bills = [Bill(**bill) for bill in data.get('bills', [])]
+        # Parse bills
+        bills = [Bill(**bill) for bill in data.get("bills", [])]
 
-    # Parse credit cards
-    credit_cards = [CreditCard(**cc) for cc in data.get('credit_cards', [])]
+        # Parse credit cards
+        credit_cards = [CreditCard(**cc) for cc in data.get("credit_cards", [])]
 
-    # Parse settings
-    settings_data = data.get('settings', {})
-    settings = Settings(**settings_data)
+        # Parse settings
+        settings_data = data.get("settings", {})
+        settings = Settings(**settings_data)
 
-    return FinancialConfig(
-        accounts=accounts,
-        income=income,
-        bills=bills,
-        credit_cards=credit_cards,
-        settings=settings
-    )
+        return FinancialConfig(
+            accounts=accounts,
+            income=income,
+            bills=bills,
+            credit_cards=credit_cards,
+            settings=settings,
+        )
+    except (KeyError, TypeError, ValueError) as e:
+        raise ValueError(f"Error parsing configuration: {e}") from e
 
 
 def save_config(config: FinancialConfig, config_path: Union[str, Path]) -> None:
-    """Save financial configuration to JSON file."""
+    """
+    Save financial configuration to JSON file.
+
+    Serializes a FinancialConfig object to JSON format and writes it to a file.
+    All enum values and dates are converted to their string representations.
+
+    Parameters
+    ----------
+    config : FinancialConfig
+        Complete financial configuration to save
+    config_path : Union[str, Path]
+        Destination path for the JSON configuration file
+
+    Raises
+    ------
+    IOError
+        If the file cannot be written
+    PermissionError
+        If there are insufficient permissions to write the file
+
+    Examples
+    --------
+    >>> config = FinancialConfig(accounts=[], income=[], bills=[], credit_cards=[], settings=Settings())
+    >>> save_config(config, "financial_config.json")
+
+    Notes
+    -----
+    The file is written with 2-space indentation for readability. Existing files
+    are overwritten without backup. Use create_backup() from config_manager before
+    calling this function if you need to preserve the previous version.
+    """
     config_path = Path(config_path)
 
     data = {
-        'accounts': [
+        "accounts": [
             {
-                'id': acc.id,
-                'name': acc.name,
-                'type': acc.type.value,
-                'balance': acc.balance,
-                'minimum_balance': acc.minimum_balance
+                "id": acc.id,
+                "name": acc.name,
+                "type": acc.type.value,
+                "balance": acc.balance,
+                "minimum_balance": acc.minimum_balance,
             }
             for acc in config.accounts
         ],
-        'income': [
+        "income": [
             {
-                'id': inc.id,
-                'source': inc.source,
-                'amount': inc.amount,
-                'frequency': inc.frequency.value,
-                'next_date': inc.next_date.isoformat(),
-                'deposit_account': inc.deposit_account,
-                'splits': [
-                    {
-                        'account_id': split.account_id,
-                        'amount': split.amount
-                    }
-                    for split in (inc.splits or [])
-                ] if inc.splits else None
+                "id": inc.id,
+                "source": inc.source,
+                "amount": inc.amount,
+                "frequency": inc.frequency.value,
+                "next_date": inc.next_date.isoformat(),
+                "deposit_account": inc.deposit_account,
+                "splits": (
+                    [
+                        {"account_id": split.account_id, "amount": split.amount}
+                        for split in inc.splits
+                    ]
+                    if inc.splits
+                    else None
+                ),
             }
             for inc in config.income
         ],
-        'bills': [
+        "bills": [
             {
-                'id': bill.id,
-                'name': bill.name,
-                'amount': bill.amount,
-                'due_day': bill.due_day,
-                'frequency': bill.frequency.value,
-                'autopay': bill.autopay,
-                'payment_account': bill.payment_account,
-                'category': bill.category,
-                'paid_by_credit': bill.paid_by_credit,
-                'last_paid': bill.last_paid.isoformat() if bill.last_paid else None
+                "id": bill.id,
+                "name": bill.name,
+                "amount": bill.amount,
+                "due_day": bill.due_day,
+                "frequency": bill.frequency.value,
+                "autopay": bill.autopay,
+                "payment_account": bill.payment_account,
+                "category": bill.category,
+                "paid_by_credit": bill.paid_by_credit,
+                "last_paid": bill.last_paid.isoformat() if bill.last_paid else None,
             }
             for bill in config.bills
         ],
-        'credit_cards': [
+        "credit_cards": [
             {
-                'id': cc.id,
-                'name': cc.name,
-                'balance': cc.balance,
-                'credit_limit': cc.credit_limit,
-                'apr': cc.apr,
-                'due_day': cc.due_day,
-                'minimum_payment': cc.minimum_payment,
-                'statement_day': cc.statement_day,
-                'payment_account': cc.payment_account
+                "id": cc.id,
+                "name": cc.name,
+                "balance": cc.balance,
+                "credit_limit": cc.credit_limit,
+                "apr": cc.apr,
+                "due_day": cc.due_day,
+                "minimum_payment": cc.minimum_payment,
+                "statement_day": cc.statement_day,
+                "payment_account": cc.payment_account,
             }
             for cc in config.credit_cards
         ],
-        'settings': {
-            'emergency_fund_target': config.settings.emergency_fund_target,
-            'planning_horizon_days': config.settings.planning_horizon_days,
-            'priority': config.settings.priority.value
-        }
+        "settings": {
+            "emergency_fund_target": config.settings.emergency_fund_target,
+            "planning_horizon_days": config.settings.planning_horizon_days,
+            "priority": config.settings.priority.value,
+        },
     }
 
-    with open(config_path, 'w') as f:
-        json.dump(data, f, indent=2)
+    try:
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except (IOError, PermissionError) as e:
+        raise IOError(f"Failed to save configuration to {config_path}: {e}") from e

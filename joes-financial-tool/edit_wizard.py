@@ -51,7 +51,7 @@ def edit_bill(config_path: str = "financial_config.json"):
     selected = list_and_select_item(
         config.bills,
         "bill",
-        lambda b: f"{b.name} - ${b.amount:.2f} (due day {b.due_day})"
+        lambda b: f"{b.name} - ${b.amount:.2f} (due day {b.due_day})",
     )
 
     if not selected:
@@ -61,17 +61,25 @@ def edit_bill(config_path: str = "financial_config.json"):
     print("Press Enter to keep current value, or enter new value:\n")
 
     # Edit fields
-    name = get_input(f"Bill name", default=selected.name, required=False) or selected.name
-    amount = get_input(f"Amount", default=selected.amount, input_type=float, required=False)
+    name = (
+        get_input(f"Bill name", default=selected.name, required=False) or selected.name
+    )
+    amount = get_input(
+        f"Amount", default=selected.amount, input_type=float, required=False
+    )
     if amount is None:
         amount = selected.amount
 
-    due_day = get_input(f"Due day (1-31)", default=selected.due_day, input_type=int, required=False)
+    due_day = get_input(
+        f"Due day (1-31)", default=selected.due_day, input_type=int, required=False
+    )
     if due_day is None:
         due_day = selected.due_day
 
     # Payment source
-    change_source = get_input("Change payment source? (y/n)", default="n", input_type=bool)
+    change_source = get_input(
+        "Change payment source? (y/n)", default="n", input_type=bool
+    )
     if change_source:
         payment_sources = []
         for acc in config.accounts:
@@ -83,7 +91,9 @@ def edit_bill(config_path: str = "financial_config.json"):
             source_labels = [label for _, label, _ in payment_sources]
             selected_label = get_choice("Select payment source:", source_labels)
             selected_idx = source_labels.index(selected_label)
-            selected.payment_account, _, selected.paid_by_credit = payment_sources[selected_idx]
+            selected.payment_account, _, selected.paid_by_credit = payment_sources[
+                selected_idx
+            ]
 
     # Update bill
     selected.name = name
@@ -108,7 +118,7 @@ def edit_account(config_path: str = "financial_config.json"):
     selected = list_and_select_item(
         config.accounts,
         "account",
-        lambda a: f"{a.name} ({a.type.value}) - ${a.balance:,.2f}"
+        lambda a: f"{a.name} ({a.type.value}) - ${a.balance:,.2f}",
     )
 
     if not selected:
@@ -117,12 +127,22 @@ def edit_account(config_path: str = "financial_config.json"):
     print(f"\nEditing: {selected.name}\n")
     print("Press Enter to keep current value:\n")
 
-    name = get_input(f"Account name", default=selected.name, required=False) or selected.name
-    balance = get_input(f"Balance", default=selected.balance, input_type=float, required=False)
+    name = (
+        get_input(f"Account name", default=selected.name, required=False)
+        or selected.name
+    )
+    balance = get_input(
+        f"Balance", default=selected.balance, input_type=float, required=False
+    )
     if balance is None:
         balance = selected.balance
 
-    min_balance = get_input(f"Minimum balance", default=selected.minimum_balance, input_type=float, required=False)
+    min_balance = get_input(
+        f"Minimum balance",
+        default=selected.minimum_balance,
+        input_type=float,
+        required=False,
+    )
     if min_balance is None:
         min_balance = selected.minimum_balance
 
@@ -148,7 +168,7 @@ def edit_credit_card(config_path: str = "financial_config.json"):
     selected = list_and_select_item(
         config.credit_cards,
         "credit card",
-        lambda cc: f"{cc.name} - ${cc.balance:,.2f} / ${cc.credit_limit:,.2f}"
+        lambda cc: f"{cc.name} - ${cc.balance:,.2f} / ${cc.credit_limit:,.2f}",
     )
 
     if not selected:
@@ -157,16 +177,27 @@ def edit_credit_card(config_path: str = "financial_config.json"):
     print(f"\nEditing: {selected.name}\n")
     print("Press Enter to keep current value:\n")
 
-    name = get_input(f"Card name", default=selected.name, required=False) or selected.name
-    balance = get_input(f"Balance", default=selected.balance, input_type=float, required=False)
+    name = (
+        get_input(f"Card name", default=selected.name, required=False) or selected.name
+    )
+    balance = get_input(
+        f"Balance", default=selected.balance, input_type=float, required=False
+    )
     if balance is None:
         balance = selected.balance
 
-    credit_limit = get_input(f"Credit limit", default=selected.credit_limit, input_type=float, required=False)
+    credit_limit = get_input(
+        f"Credit limit", default=selected.credit_limit, input_type=float, required=False
+    )
     if credit_limit is None:
         credit_limit = selected.credit_limit
 
-    min_payment = get_input(f"Minimum payment", default=selected.minimum_payment, input_type=float, required=False)
+    min_payment = get_input(
+        f"Minimum payment",
+        default=selected.minimum_payment,
+        input_type=float,
+        required=False,
+    )
     if min_payment is None:
         min_payment = selected.minimum_payment
 
@@ -193,7 +224,7 @@ def edit_income(config_path: str = "financial_config.json"):
     selected = list_and_select_item(
         config.income,
         "income source",
-        lambda inc: f"{inc.source} - ${inc.amount:,.2f} {inc.frequency.value}"
+        lambda inc: f"{inc.source} - ${inc.amount:,.2f} {inc.frequency.value}",
     )
 
     if not selected:
@@ -202,13 +233,20 @@ def edit_income(config_path: str = "financial_config.json"):
     print(f"\nEditing: {selected.source}\n")
     print("Press Enter to keep current value:\n")
 
-    source = get_input(f"Source name", default=selected.source, required=False) or selected.source
-    amount = get_input(f"Amount", default=selected.amount, input_type=float, required=False)
+    source = (
+        get_input(f"Source name", default=selected.source, required=False)
+        or selected.source
+    )
+    amount = get_input(
+        f"Amount", default=selected.amount, input_type=float, required=False
+    )
     if amount is None:
         amount = selected.amount
 
     # Account splits
-    change_splits = get_input("Change account deposits/splits? (y/n)", default="n", input_type=bool)
+    change_splits = get_input(
+        "Change account deposits/splits? (y/n)", default="n", input_type=bool
+    )
     if change_splits:
         from models import IncomeSplit
 
@@ -218,10 +256,14 @@ def edit_income(config_path: str = "financial_config.json"):
         if not config.accounts:
             print("⚠️  No accounts available for deposit")
         else:
-            account_choices = [f"{acc.name} ({acc.type.value})" for acc in config.accounts]
+            account_choices = [
+                f"{acc.name} ({acc.type.value})" for acc in config.accounts
+            ]
 
             # Ask if they want to split
-            split_income = get_input("Split across multiple accounts? (y/n)", default="n", input_type=bool)
+            split_income = get_input(
+                "Split across multiple accounts? (y/n)", default="n", input_type=bool
+            )
 
             if split_income:
                 print("\nSet up splits (last account will receive remainder):")
@@ -229,12 +271,12 @@ def edit_income(config_path: str = "financial_config.json"):
 
                 for i, acc in enumerate(config.accounts[:-1]):  # All but last
                     split_amount = get_input(
-                        f"  Amount to {acc.name}",
-                        input_type=float,
-                        required=False
+                        f"  Amount to {acc.name}", input_type=float, required=False
                     )
                     if split_amount and split_amount > 0:
-                        splits.append(IncomeSplit(account_id=acc.id, amount=split_amount))
+                        splits.append(
+                            IncomeSplit(account_id=acc.id, amount=split_amount)
+                        )
                         total_allocated += split_amount
 
                 # Last account gets remainder
@@ -242,10 +284,14 @@ def edit_income(config_path: str = "financial_config.json"):
                     last_acc = config.accounts[-1]
                     remainder = amount - total_allocated
                     print(f"  Remainder to {last_acc.name}: ${remainder:,.2f}")
-                    splits.append(IncomeSplit(account_id=last_acc.id, amount=None))  # None = remainder
+                    splits.append(
+                        IncomeSplit(account_id=last_acc.id, amount=None)
+                    )  # None = remainder
             else:
                 # Single account
-                selected_label = get_choice("Deposit to which account?", account_choices)
+                selected_label = get_choice(
+                    "Deposit to which account?", account_choices
+                )
                 selected_idx = account_choices.index(selected_label)
                 selected_account = config.accounts[selected_idx]
                 splits = [IncomeSplit(account_id=selected_account.id, amount=None)]
