@@ -89,7 +89,8 @@ def save_config(config: FinancialConfig, config_path: Union[str, Path]) -> None:
                 'autopay': bill.autopay,
                 'payment_account': bill.payment_account,
                 'category': bill.category,
-                'paid_by_credit': bill.paid_by_credit
+                'paid_by_credit': bill.paid_by_credit,
+                'last_paid': bill.last_paid.isoformat() if bill.last_paid else None
             }
             for bill in config.bills
         ],

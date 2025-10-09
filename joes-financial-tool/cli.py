@@ -17,6 +17,7 @@ from setup_wizard import (
 from edit_wizard import (
     edit_account, edit_income, edit_bill, edit_credit_card
 )
+from bill_tracker import mark_bill_paid
 from config_manager import (
     get_dated_config_name, select_config_interactive, list_config_files,
     get_most_recent_config
@@ -42,26 +43,28 @@ def print_menu(current_config: str = "financial_config.json"):
     print(f"Current config: {current_config}\n")
     print("Main Menu:\n")
     print("  VIEW:")
-    print("    1. 📋 Today's Action Plan")
-    print("    2. 📊 Financial Summary")
-    print("    3. 📅 14-Day Cash Flow Forecast")
-    print("    4. 🏦 Account Details")
-    print("    5. 📖 View All Information")
+    print("    1. 📋 Today's Actions")
+    print("    2. 📅 5-Day Action Plan")
+    print("    3. 📊 Financial Summary")
+    print("    4. 📈 14-Day Cash Flow Forecast")
+    print("    5. 🏦 Account Details")
+    print("    6. 📖 View All Information")
     print()
     print("  MANAGE:")
-    print("    6. 🔄 Update Account Balances")
-    print("    7. ➕ Add New Account")
-    print("    8. ➕ Add New Income Source")
-    print("    9. ➕ Add New Bill")
-    print("   10. ➕ Add New Credit Card")
-    print("   11. ✏️  Edit Account")
-    print("   12. ✏️  Edit Income Source")
-    print("   13. ✏️  Edit Bill")
-    print("   14. ✏️  Edit Credit Card")
+    print("    7. ✅ Mark Bill as Paid")
+    print("    8. 🔄 Update Account Balances")
+    print("    9. ➕ Add New Account")
+    print("   10. ➕ Add New Income Source")
+    print("   11. ➕ Add New Bill")
+    print("   12. ➕ Add New Credit Card")
+    print("   13. ✏️  Edit Account")
+    print("   14. ✏️  Edit Income Source")
+    print("   15. ✏️  Edit Bill")
+    print("   16. ✏️  Edit Credit Card")
     print()
     print("  SETUP:")
-    print("   15. ⚙️  Run Full Setup Wizard (creates new dated config)")
-    print("   16. 📂 Load Previous Config")
+    print("   17. ⚙️  Run Full Setup Wizard (creates new dated config)")
+    print("   18. 📂 Load Previous Config")
     print()
     print("    0. 🚪 Exit")
     print()
@@ -71,10 +74,10 @@ def get_menu_choice():
     """Get user's menu choice."""
     while True:
         try:
-            choice = input("Select option (0-16): ").strip()
-            if choice.isdigit() and 0 <= int(choice) <= 16:
+            choice = input("Select option (0-18): ").strip()
+            if choice.isdigit() and 0 <= int(choice) <= 18:
                 return int(choice)
-            print("⚠️  Please enter a number between 0 and 16")
+            print("⚠️  Please enter a number between 0 and 18")
         except KeyboardInterrupt:
             print("\n")
             return 0
@@ -88,11 +91,11 @@ def pause():
 
 
 def print_tasks(optimizer: FinancialOptimizer, target_date: date = None):
-    """Print concrete daily tasks with specific amounts."""
+    """Print concrete daily tasks with specific amounts for today only."""
     if target_date is None:
         target_date = date.today()
 
-    print_header(f"Action Plan for {target_date.strftime('%A, %B %d, %Y')}")
+    print_header(f"Today's Actions - {target_date.strftime('%A, %B %d, %Y')}")
 
     # Show current cash position
     available = sum(acc.balance - acc.minimum_balance for acc in optimizer.config.accounts)
@@ -101,12 +104,48 @@ def print_tasks(optimizer: FinancialOptimizer, target_date: date = None):
 
     tasks = optimizer.generate_daily_tasks(target_date)
 
-    if not tasks:
-        print("✓ No required actions today!\n")
-        return
+    # Filter to only today's actions (priority 1-4, skip upcoming summary)
+    today_tasks = [t for t in tasks if t.priority < 5]
 
-    for task in tasks:
-        print(f"{task.category}: {task}")
+    if not today_tasks:
+        print("✓ No required actions today!\n")
+    else:
+        print("📋 ACTIONS FOR TODAY:\n")
+        for task in today_tasks:
+            if task.amount:
+                print(f"{task.category}: {task.description} ${task.amount:,.2f}")
+            else:
+                print(f"{task.category}: {task.description}")
+
+    print()
+
+
+def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
+    """Print action plan for the next N days."""
+    print_header(f"Upcoming {days}-Day Action Plan")
+
+    timeline = optimizer.get_cash_flow_forecast(days=days)
+
+    for day_offset in range(days):
+        current_date = date.today() + timedelta(days=day_offset)
+        if current_date not in timeline:
+            continue
+
+        day_data = timeline[current_date]
+        day_label = "TODAY" if day_offset == 0 else f"+{day_offset} day{'s' if day_offset > 1 else ''}"
+
+        # Get required events for this day
+        required_events = [e for e in day_data.events if e.required and e.amount < 0]
+        income_events = [e for e in day_data.events if e.amount > 0]
+
+        if required_events or income_events:
+            print(f"\n📅 {current_date.strftime('%a %b %d')} ({day_label})")
+
+            for event in income_events:
+                print(f"   💵 INCOME: +${event.amount:,.2f} from {event.description}")
+
+            for event in required_events:
+                print(f"   💳 PAY: ${-event.amount:,.2f} - {event.description}")
 
     print()
 
@@ -280,7 +319,7 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
             print("\n👋 Thanks for using Financial Optimization Tool!\n")
             break
 
-        elif choice == 15:
+        elif choice == 17:
             # Run full setup wizard - creates new dated config
             clear_screen()
             dated_config = get_dated_config_name()
@@ -291,7 +330,7 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
                 pause()
             continue
 
-        elif choice == 16:
+        elif choice == 18:
             # Load previous config
             clear_screen()
             print_header("Load Previous Configuration")
@@ -302,30 +341,32 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
             pause()
             continue
 
-        # For options 7-10, we can add to config even if it doesn't exist yet
-        if choice in [7, 8, 9, 10]:
+        # For options 7 and 9-12, we can add/mark bills without loading full config
+        if choice in [7, 9, 10, 11, 12]:
             clear_screen()
             if choice == 7:
-                add_account_to_config(current_config)
-            elif choice == 8:
-                add_income_to_config(current_config)
+                mark_bill_paid(current_config)
             elif choice == 9:
-                add_bill_to_config(current_config)
+                add_account_to_config(current_config)
             elif choice == 10:
+                add_income_to_config(current_config)
+            elif choice == 11:
+                add_bill_to_config(current_config)
+            elif choice == 12:
                 add_credit_card_to_config(current_config)
             pause()
             continue
 
-        # For options 11-14, edit existing items (need valid config)
-        if choice in [11, 12, 13, 14]:
+        # For options 13-16, edit existing items (need valid config)
+        if choice in [13, 14, 15, 16]:
             clear_screen()
-            if choice == 11:
+            if choice == 13:
                 edit_account(current_config)
-            elif choice == 12:
-                edit_income(current_config)
-            elif choice == 13:
-                edit_bill(current_config)
             elif choice == 14:
+                edit_income(current_config)
+            elif choice == 15:
+                edit_bill(current_config)
+            elif choice == 16:
                 edit_credit_card(current_config)
             pause()
             continue
@@ -337,8 +378,8 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
         except FileNotFoundError:
             clear_screen()
             print(f"\n❌ Config file not found: {current_config}\n")
-            print("Please run the Full Setup Wizard (option 11) to create your configuration,")
-            print("or Load Previous Config (option 12) to use an existing one.")
+            print("Please run the Full Setup Wizard (option 17) to create your configuration,")
+            print("or Load Previous Config (option 18) to use an existing one.")
             pause()
             continue
         except Exception as e:
@@ -350,34 +391,40 @@ def run_interactive_mode(config_path: str = 'financial_config.json'):
         clear_screen()
 
         if choice == 1:
-            # View Today's Action Plan
+            # View Today's Actions
             print_tasks(optimizer)
             pause()
 
         elif choice == 2:
+            # View 5-Day Action Plan
+            print_upcoming_plan(optimizer, days=5)
+            pause()
+
+        elif choice == 3:
             # View Financial Summary
             print_summary(optimizer)
             pause()
 
-        elif choice == 3:
+        elif choice == 4:
             # View 14-Day Cash Flow Forecast
             print_cash_flow_forecast(optimizer)
             pause()
 
-        elif choice == 4:
+        elif choice == 5:
             # View Account Details
             print_accounts(optimizer)
             pause()
 
-        elif choice == 5:
+        elif choice == 6:
             # View All Information
             print_tasks(optimizer)
+            print_upcoming_plan(optimizer, days=5)
             print_summary(optimizer)
             print_cash_flow_forecast(optimizer)
             print_accounts(optimizer)
             pause()
 
-        elif choice == 6:
+        elif choice == 8:
             # Update Account Balances
             interactive_update(current_config)
             pause()

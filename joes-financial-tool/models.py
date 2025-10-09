@@ -98,12 +98,28 @@ class Bill:
     payment_account: Optional[str] = None  # Account ID or credit card ID
     category: Optional[str] = None
     paid_by_credit: bool = False  # True if payment_account is a credit card
+    last_paid: Optional[date] = None  # Last date this bill was paid
 
     def __post_init__(self):
         if isinstance(self.frequency, str):
             self.frequency = Frequency(self.frequency)
         if not 1 <= self.due_day <= 31:
             raise ValueError(f"due_day must be between 1 and 31, got {self.due_day}")
+        if isinstance(self.last_paid, str):
+            self.last_paid = datetime.strptime(self.last_paid, "%Y-%m-%d").date()
+
+    def is_paid_for_date(self, check_date: date) -> bool:
+        """Check if this bill has been paid for the given date."""
+        if not self.last_paid:
+            return False
+
+        # For monthly bills, check if we've paid this month
+        if self.frequency == Frequency.MONTHLY:
+            return (self.last_paid.year == check_date.year and
+                    self.last_paid.month == check_date.month)
+
+        # For other frequencies, check if last_paid is on or after the check_date
+        return self.last_paid >= check_date
 
 
 @dataclass

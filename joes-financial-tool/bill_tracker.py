@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""
+Bill payment tracking utilities.
+"""
+
+from datetime import date
+from config_loader import load_config, save_config
+from setup_wizard import print_header, get_input
+
+
+def mark_bill_paid(config_path: str = "financial_config.json"):
+    """Mark a bill as paid for this month."""
+    try:
+        config = load_config(config_path)
+    except Exception as e:
+        print(f"❌ Error loading config: {e}")
+        return False
+
+    print_header("Mark Bill as Paid")
+
+    # Filter to non-autopay bills only
+    non_autopay_bills = [b for b in config.bills if not b.autopay]
+
+    if not non_autopay_bills:
+        print("\n❌ No non-autopay bills found in configuration.\n")
+        return False
+
+    print("\nSelect bill to mark as paid:\n")
+    for i, bill in enumerate(non_autopay_bills, 1):
+        paid_status = "✓ PAID" if bill.is_paid_for_date(date.today()) else "⚠️  UNPAID"
+        print(f"  {i}. {bill.name} - ${bill.amount:.2f} (due day {bill.due_day}) [{paid_status}]")
+    print(f"  0. Cancel")
+
+    while True:
+        try:
+            choice = input(f"\nSelect bill (0-{len(non_autopay_bills)}): ").strip()
+            if not choice.isdigit():
+                print("⚠️  Please enter a number")
+                continue
+
+            choice_num = int(choice)
+            if choice_num == 0:
+                return False
+            if 1 <= choice_num <= len(non_autopay_bills):
+                selected = non_autopay_bills[choice_num - 1]
+                break
+
+            print(f"⚠️  Please enter a number between 0 and {len(non_autopay_bills)}")
+        except KeyboardInterrupt:
+            print("\n")
+            return False
+
+    # Ask for payment date
+    print(f"\nMarking {selected.name} as paid")
+    use_today = get_input("Use today's date? (y/n)", default="y", input_type=bool)
+
+    if use_today:
+        payment_date = date.today()
+    else:
+        print("\nEnter payment date:")
+        year = get_input("  Year", default=date.today().year, input_type=int)
+        month = get_input("  Month (1-12)", input_type=int)
+        day = get_input("  Day (1-31)", input_type=int)
+
+        try:
+            payment_date = date(year, month, day)
+        except ValueError:
+            print("  ⚠️  Invalid date, using today")
+            payment_date = date.today()
+
+    # Update bill's last_paid
+    selected.last_paid = payment_date
+    save_config(config, config_path)
+
+    print(f"\n✓ Marked {selected.name} as paid on {payment_date.isoformat()}\n")
+    return True

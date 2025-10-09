@@ -217,6 +217,10 @@ class FinancialOptimizer:
             # Add bill payments (only those paid from checking/savings, not credit)
             for bill_date, bill in self.get_upcoming_bills(days_ahead=days_ahead):
                 if bill_date == current_date and not bill.paid_by_credit:
+                    # Skip if bill is already paid for this date
+                    if bill.is_paid_for_date(current_date):
+                        continue
+
                     # Only deduct from cash flow if paid from checking/savings
                     daily.events.append(CashFlowEvent(
                         date=current_date,
@@ -260,8 +264,12 @@ class FinancialOptimizer:
 
         # Safe to spend = current available - buffer for upcoming expenses
         # We need to ensure we don't go below minimum at any point
-        safety_buffer = max(0, min_balance_required - min_future_balance) + 100  # Extra $100 buffer
+        safety_buffer = max(0, min_balance_required - min_future_balance) + 200  # Extra $200 buffer for safety
         safe_amount = max(0, current_available - safety_buffer)
+
+        # Don't recommend any extra payments if we don't have enough cushion
+        if safe_amount < 50:
+            return {}
 
         # Allocate payments based on strategy
         payments = {}
@@ -272,22 +280,27 @@ class FinancialOptimizer:
         if emergency_fund < self.config.settings.emergency_fund_target:
             needed = self.config.settings.emergency_fund_target - emergency_fund
             emergency_payment = min(remaining * 0.3, needed)  # 30% max to emergency
-            if emergency_payment > 0:
+            if emergency_payment > 10:  # Only if meaningful amount
                 payments['emergency_fund'] = emergency_payment
                 remaining -= emergency_payment
 
         # Priority 2: Extra credit card payments
-        if remaining > 20:  # Only if we have meaningful amount left
+        if remaining > 50:  # Only if we have meaningful amount left
             priority_cards = self.prioritize_credit_cards()
             for cc in priority_cards:
-                if remaining <= 0:
+                if remaining <= 10:
                     break
 
-                # Calculate how much to pay this card
-                # Start with at least $20, or up to 80% of remaining
-                payment = min(remaining * 0.8, cc.balance - cc.minimum_payment)
+                # Don't recommend more than the card's current balance
+                max_extra_payment = max(0, cc.balance - cc.minimum_payment)
+                if max_extra_payment <= 0:
+                    continue
 
-                if payment >= 10:  # Only suggest if meaningful
+                # Calculate how much to pay this card
+                # Pay up to 70% of remaining, but not more than the card balance
+                payment = min(remaining * 0.7, max_extra_payment)
+
+                if payment >= 20:  # Only suggest if $20 or more
                     payments[cc.id] = payment
                     remaining -= payment
 
