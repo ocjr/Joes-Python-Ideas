@@ -354,32 +354,43 @@ class FinancialOptimizer:
                     action="wait"
                 ))
 
-        # Priority 3: Calculate and recommend extra payments
-        safe_payments = self.calculate_safe_payment_amount()
+        # Priority 3: Extra payments - ONLY on credit card due dates
+        # Check if today is a due date for any credit card
+        cards_due_today = []
+        for cc in self.config.credit_cards:
+            if cc.balance > 0:
+                cc_due = self.get_next_date(cc.due_day)
+                if cc_due == target_date:
+                    cards_due_today.append(cc)
 
-        if 'emergency_fund' in safe_payments:
-            tasks.append(Task(
-                date=target_date,
-                priority=3,
-                category="🏦 SAVE",
-                description="Transfer to emergency fund",
-                amount=safe_payments['emergency_fund'],
-                action="transfer"
-            ))
+        # Only calculate extra payments if we have cards due today
+        if cards_due_today:
+            safe_payments = self.calculate_safe_payment_amount()
 
-        priority_cards = self.prioritize_credit_cards()
-        for cc in priority_cards:
-            if cc.id in safe_payments:
-                daily_interest_savings = (safe_payments[cc.id] * cc.apr) / 365
+            if 'emergency_fund' in safe_payments:
                 tasks.append(Task(
                     date=target_date,
-                    priority=4,
-                    category="💳 EXTRA PAYMENT",
-                    description=f"Pay extra to {cc.name} (APR {cc.apr*100:.1f}%, saves ${daily_interest_savings:.2f}/day)",
-                    amount=safe_payments[cc.id],
-                    account_id=cc.payment_account,
-                    action="pay"
+                    priority=3,
+                    category="🏦 SAVE",
+                    description="Transfer to emergency fund",
+                    amount=safe_payments['emergency_fund'],
+                    action="transfer"
                 ))
+
+            # Only show extra payments for cards that are actually due today
+            priority_cards = self.prioritize_credit_cards()
+            for cc in priority_cards:
+                if cc in cards_due_today and cc.id in safe_payments:
+                    daily_interest_savings = (safe_payments[cc.id] * cc.apr) / 365
+                    tasks.append(Task(
+                        date=target_date,
+                        priority=4,
+                        category="💳 EXTRA PAYMENT",
+                        description=f"Pay extra to {cc.name} (APR {cc.apr*100:.1f}%, saves ${daily_interest_savings:.2f}/day)",
+                        amount=safe_payments[cc.id],
+                        account_id=cc.payment_account,
+                        action="pay"
+                    ))
 
         # Priority 5: Show what's coming in next 7 days
         upcoming_required = []
