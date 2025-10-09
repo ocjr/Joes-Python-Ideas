@@ -116,10 +116,8 @@ def print_tasks(optimizer: FinancialOptimizer, target_date: date = None):
     else:
         print("📋 ACTIONS FOR TODAY:\n")
         for task in today_tasks:
-            if task.amount:
-                print(f"{task.category}: {task.description} ${task.amount:,.2f}")
-            else:
-                print(f"{task.category}: {task.description}")
+            # Description already includes the amount details, don't duplicate
+            print(f"{task.category}: {task.description}")
 
     print()
 
@@ -142,53 +140,65 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
         required_events = [e for e in day_data.events if e.required and e.amount < 0]
         income_events = [e for e in day_data.events if e.amount > 0]
 
-        # Check if any credit cards are due today (for extra payments)
-        cards_due_today = []
+        # Check if any credit cards are due today
+        cards_due_today = {}
+        cc_min_payments = {}
         for cc in optimizer.config.credit_cards:
             if cc.balance > 0:
                 cc_due = optimizer.get_next_date(cc.due_day)
                 if cc_due == current_date:
-                    cards_due_today.append(cc)
+                    cards_due_today[cc.id] = cc
+                    cc_min_payments[cc.id] = cc.minimum_payment
 
         # Calculate extra payments for cards due today
-        extra_payments = {}
+        safe_payments = {}
+        emergency_fund_payment = 0
         if cards_due_today:
             safe_payments = optimizer.calculate_safe_payment_amount()
             emergency_fund_payment = safe_payments.get('emergency_fund', 0)
 
-            for cc in cards_due_today:
-                if cc.id in safe_payments:
-                    extra_payments[cc.id] = {
-                        'amount': safe_payments[cc.id],
-                        'card': cc
-                    }
-
         # Show this day if there's anything happening
-        if required_events or income_events or extra_payments:
+        if required_events or income_events or cards_due_today:
             print(f"\n📅 {current_date.strftime('%a %b %d')} ({day_label})")
 
             for event in income_events:
-                print(f"   💵 INCOME: +${event.amount:,.2f} from {event.description}")
+                description = event.description.replace("Income: ", "")
+                print(f"   💵 INCOME: +${event.amount:,.2f} from {description}")
 
+            # Show payments (combine CC min + extra)
             for event in required_events:
-                print(f"   💳 PAY: ${-event.amount:,.2f} - {event.description}")
+                # Check if this is a CC payment
+                is_cc_payment = False
+                for cc_id, cc in cards_due_today.items():
+                    if f"CC Min Payment: {cc.name}" in event.description:
+                        min_payment = cc_min_payments[cc_id]
+                        extra_payment = safe_payments.get(cc_id, 0)
+                        total_payment = min_payment + extra_payment
 
-            # Show extra payment recommendations
-            if cards_due_today and safe_payments:
-                if emergency_fund_payment > 0:
-                    print(f"   🏦 SAVE: ${emergency_fund_payment:,.2f} to Emergency Fund")
+                        if extra_payment > 0:
+                            daily_savings = (extra_payment * cc.apr) / 365
+                            print(f"   💳 PAY: ${total_payment:,.2f} to {cc.name} (${min_payment:,.2f} min + ${extra_payment:,.2f} extra, saves ${daily_savings:.2f}/day)")
+                        else:
+                            print(f"   💳 PAY: ${total_payment:,.2f} to {cc.name} (minimum payment)")
 
-                for cc_id, payment_info in extra_payments.items():
-                    cc = payment_info['card']
-                    amount = payment_info['amount']
-                    daily_savings = (amount * cc.apr) / 365
-                    print(f"   💳 EXTRA: ${amount:,.2f} to {cc.name} (saves ${daily_savings:.2f}/day)")
+                        is_cc_payment = True
+                        break
+
+                # Not a CC payment, show as regular bill
+                if not is_cc_payment:
+                    description = event.description.replace("Bill: ", "").replace("[AUTO]", "").strip()
+                    autopay = "[AUTO]" if "[AUTO]" in event.description else ""
+                    print(f"   💳 PAY: ${-event.amount:,.2f} - {description} {autopay}")
+
+            # Show emergency fund savings
+            if emergency_fund_payment > 0:
+                print(f"   🏦 SAVE: ${emergency_fund_payment:,.2f} to Emergency Fund")
 
     print()
 
 
 def print_cash_flow_forecast(optimizer: FinancialOptimizer):
-    """Print 14-day cash flow forecast."""
+    """Print 14-day cash flow forecast with recommended payments."""
     print_header("14-Day Cash Flow Forecast")
 
     timeline = optimizer.get_cash_flow_forecast(days=14)
@@ -197,27 +207,89 @@ def print_cash_flow_forecast(optimizer: FinancialOptimizer):
     print(f"{'Date':<12} {'Starting':<12} {'Events':<8} {'Ending':<12} {'Status':<10}")
     print("-" * 70)
 
+    # Track cumulative extra payments to adjust balances
+    cumulative_extra = 0.0
+
     for day_date in sorted(timeline.keys()):
         day_data = timeline[day_date]
         day_str = day_date.strftime("%a %m/%d")
 
+        # Check if any credit cards are due this day
+        cards_due_today = {}
+        cc_min_payments = {}
+        for cc in optimizer.config.credit_cards:
+            if cc.balance > 0:
+                cc_due = optimizer.get_next_date(cc.due_day)
+                if cc_due == day_date:
+                    cards_due_today[cc.id] = cc
+                    cc_min_payments[cc.id] = cc.minimum_payment
+
+        # Calculate extra payments for cards due today
+        safe_payments = {}
+        emergency_fund_payment = 0
+        if cards_due_today:
+            safe_payments = optimizer.calculate_safe_payment_amount()
+            emergency_fund_payment = safe_payments.get('emergency_fund', 0)
+
+        # Calculate total extra payments for this day
+        day_extra_total = 0
+        for cc_id in cards_due_today.keys():
+            extra_payment = safe_payments.get(cc_id, 0)
+            day_extra_total += extra_payment
+
+        if emergency_fund_payment > 0:
+            day_extra_total += emergency_fund_payment
+
+        # Adjust starting and ending balances
+        adjusted_starting = day_data.starting_balance - cumulative_extra
+        adjusted_ending = day_data.ending_balance - cumulative_extra - day_extra_total
+
+        # Update cumulative
+        cumulative_extra += day_extra_total
+
         events_count = len(day_data.events)
+        # Add emergency fund as an event if applicable
+        if emergency_fund_payment > 0:
+            events_count += 1
+
         events_str = f"{events_count} event{'s' if events_count != 1 else ''}"
 
         # Status indicator
-        if day_data.ending_balance < min_required:
+        if adjusted_ending < min_required:
             status = "⚠️  LOW"
-        elif day_data.ending_balance < min_required + 200:
+        elif adjusted_ending < min_required + 200:
             status = "⚠️  TIGHT"
         else:
             status = "✓ OK"
 
-        print(f"{day_str:<12} ${day_data.starting_balance:>9,.2f} {events_str:>8} ${day_data.ending_balance:>9,.2f}  {status}")
+        print(f"{day_str:<12} ${adjusted_starting:>9,.2f} {events_str:>8} ${adjusted_ending:>9,.2f}  {status}")
 
         # Show events for this day
         for event in day_data.events:
-            symbol = "+" if event.amount > 0 else ""
-            print(f"             └─ {symbol}${event.amount:,.2f} {event.description}")
+            # Check if this is a CC payment that should show combined amount
+            is_cc_payment = False
+            for cc_id, cc in cards_due_today.items():
+                if f"CC Min Payment: {cc.name}" in event.description:
+                    min_payment = cc_min_payments[cc_id]
+                    extra_payment = safe_payments.get(cc_id, 0)
+                    total_payment = min_payment + extra_payment
+
+                    if extra_payment > 0:
+                        print(f"             └─ $-{total_payment:,.2f} Pay {cc.name} (${min_payment:,.2f} min + ${extra_payment:,.2f} extra)")
+                    else:
+                        print(f"             └─ $-{total_payment:,.2f} {event.description}")
+
+                    is_cc_payment = True
+                    break
+
+            if not is_cc_payment:
+                symbol = "+" if event.amount > 0 else ""
+                description = event.description.replace("Income: ", "").replace("Bill: ", "")
+                print(f"             └─ {symbol}${event.amount:,.2f} {description}")
+
+        # Show emergency fund if applicable
+        if emergency_fund_payment > 0:
+            print(f"             └─ $-{emergency_fund_payment:,.2f} Emergency Fund")
 
     print()
 

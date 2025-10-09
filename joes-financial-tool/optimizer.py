@@ -328,69 +328,89 @@ class FinancialOptimizer:
                 action="review"
             ))
 
-        # Priority 1: Required payments TODAY
-        for event in today_balance.events:
-            if event.amount < 0 and event.required:  # Expense that's required
-                tasks.append(Task(
-                    date=target_date,
-                    priority=1,
-                    category="💳 REQUIRED",
-                    description=event.description,
-                    amount=-event.amount,
-                    account_id=event.account_id,
-                    action="pay"
-                ))
-
-        # Priority 2: Income expected today
-        for event in today_balance.events:
-            if event.amount > 0:
-                tasks.append(Task(
-                    date=target_date,
-                    priority=2,
-                    category="💵 INCOME",
-                    description=event.description,
-                    amount=event.amount,
-                    account_id=event.account_id,
-                    action="wait"
-                ))
-
-        # Priority 3: Extra payments - ONLY on credit card due dates
-        # Check if today is a due date for any credit card
-        cards_due_today = []
+        # Check if any credit cards are due today
+        cards_due_today = {}  # cc.id -> cc object
+        cc_min_payments = {}  # cc.id -> minimum payment amount
         for cc in self.config.credit_cards:
             if cc.balance > 0:
                 cc_due = self.get_next_date(cc.due_day)
                 if cc_due == target_date:
-                    cards_due_today.append(cc)
+                    cards_due_today[cc.id] = cc
+                    cc_min_payments[cc.id] = cc.minimum_payment
 
-        # Only calculate extra payments if we have cards due today
+        # Calculate extra payments if cards are due today
+        safe_payments = {}
+        emergency_fund_payment = 0
         if cards_due_today:
             safe_payments = self.calculate_safe_payment_amount()
+            emergency_fund_payment = safe_payments.get('emergency_fund', 0)
 
-            if 'emergency_fund' in safe_payments:
+        # Priority 1: Required payments TODAY (combine CC min + extra)
+        for event in today_balance.events:
+            if event.amount < 0 and event.required:
+                # Check if this is a CC minimum payment that we should augment
+                is_cc_payment = False
+                for cc_id, cc in cards_due_today.items():
+                    if f"CC Min Payment: {cc.name}" in event.description:
+                        # This is a CC payment - combine min + extra
+                        min_payment = cc_min_payments[cc_id]
+                        extra_payment = safe_payments.get(cc_id, 0)
+                        total_payment = min_payment + extra_payment
+
+                        if extra_payment > 0:
+                            daily_savings = (extra_payment * cc.apr) / 365
+                            description = f"Pay ${total_payment:,.2f} to {cc.name} (${min_payment:,.2f} min + ${extra_payment:,.2f} extra, saves ${daily_savings:.2f}/day)"
+                        else:
+                            description = f"Pay ${total_payment:,.2f} to {cc.name} (minimum payment)"
+
+                        tasks.append(Task(
+                            date=target_date,
+                            priority=1,
+                            category="💳 PAY",
+                            description=description,
+                            amount=total_payment,
+                            account_id=event.account_id,
+                            action="pay"
+                        ))
+                        is_cc_payment = True
+                        break
+
+                # If not a CC payment, add as regular required payment
+                if not is_cc_payment:
+                    tasks.append(Task(
+                        date=target_date,
+                        priority=1,
+                        category="💳 PAY",
+                        description=event.description.replace("Bill: ", ""),
+                        amount=-event.amount,
+                        account_id=event.account_id,
+                        action="pay"
+                    ))
+
+        # Priority 2: Emergency fund (only on CC due dates)
+        if emergency_fund_payment > 0:
+            tasks.append(Task(
+                date=target_date,
+                priority=2,
+                category="🏦 SAVE",
+                description=f"Transfer ${emergency_fund_payment:,.2f} to emergency fund",
+                amount=emergency_fund_payment,
+                action="transfer"
+            ))
+
+        # Priority 3: Income expected today
+        for event in today_balance.events:
+            if event.amount > 0:
+                source = event.description.replace("Income: ", "")
                 tasks.append(Task(
                     date=target_date,
                     priority=3,
-                    category="🏦 SAVE",
-                    description="Transfer to emergency fund",
-                    amount=safe_payments['emergency_fund'],
-                    action="transfer"
+                    category="💵 INCOME",
+                    description=f"${event.amount:,.2f} from {source}",
+                    amount=event.amount,
+                    account_id=event.account_id,
+                    action="wait"
                 ))
-
-            # Only show extra payments for cards that are actually due today
-            priority_cards = self.prioritize_credit_cards()
-            for cc in priority_cards:
-                if cc in cards_due_today and cc.id in safe_payments:
-                    daily_interest_savings = (safe_payments[cc.id] * cc.apr) / 365
-                    tasks.append(Task(
-                        date=target_date,
-                        priority=4,
-                        category="💳 EXTRA PAYMENT",
-                        description=f"Pay extra to {cc.name} (APR {cc.apr*100:.1f}%, saves ${daily_interest_savings:.2f}/day)",
-                        amount=safe_payments[cc.id],
-                        account_id=cc.payment_account,
-                        action="pay"
-                    ))
 
         # Priority 5: Show what's coming in next 7 days
         upcoming_required = []
