@@ -128,10 +128,36 @@ def print_tasks(optimizer: FinancialOptimizer, target_date: date = None):
 
 
 def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
-    """Print action plan for the next N days."""
+    """Print action plan for the next N days as a table with running account balances."""
     print_header(f"Upcoming {days}-Day Action Plan")
 
     timeline = optimizer.get_cash_flow_forecast(days=days)
+
+    # Build list of all accounts (bank accounts + credit cards)
+    accounts = []
+    account_balances = {}
+
+    # Add bank accounts (checking, savings, cash)
+    for acc in optimizer.config.accounts:
+        accounts.append({"id": acc.id, "name": acc.name, "is_credit": False})
+        account_balances[acc.id] = acc.balance
+
+    # Add credit cards
+    for cc in optimizer.config.credit_cards:
+        accounts.append({"id": cc.id, "name": cc.name, "is_credit": True})
+        account_balances[cc.id] = cc.balance
+
+    # Prepare transactions list with running balances
+    transactions = []
+
+    # Add starting balance row
+    starting_row = {
+        "date": date.today(),
+        "action": "Starting Balance",
+        "amount": None,
+        "balances": {acc["id"]: account_balances[acc["id"]] for acc in accounts},
+    }
+    transactions.append(starting_row)
 
     # Find the NEXT credit card due date to only show extra payments once
     next_cc_due_date = None
@@ -141,21 +167,13 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
             if next_cc_due_date is None or cc_due < next_cc_due_date:
                 next_cc_due_date = cc_due
 
+    # Process each day and build transaction rows
     for day_offset in range(days):
         current_date = date.today() + timedelta(days=day_offset)
         if current_date not in timeline:
             continue
 
         day_data = timeline[current_date]
-        day_label = (
-            "TODAY"
-            if day_offset == 0
-            else f"+{day_offset} day{'s' if day_offset > 1 else ''}"
-        )
-
-        # Get required events for this day
-        required_events = [e for e in day_data.events if e.required and e.amount < 0]
-        income_events = [e for e in day_data.events if e.amount > 0]
 
         # Check if any credit cards are due today
         cards_due_today = {}
@@ -174,35 +192,76 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
             safe_payments = optimizer.calculate_safe_payment_amount()
             emergency_fund_payment = safe_payments.get("emergency_fund", 0)
 
-        # Show this day if there's anything happening
-        if required_events or income_events or cards_due_today:
-            print(f"\n📅 {current_date.strftime('%a %b %d')} ({day_label})")
-
-            for event in income_events:
+        # Process income events
+        for event in day_data.events:
+            if event.amount > 0:
                 description = event.description.replace("Income: ", "")
-                print(f"   💵 INCOME: +${event.amount:,.2f} from {description}")
+                # Apply income to appropriate account
+                if event.account_id:
+                    account_balances[event.account_id] += event.amount
+                else:
+                    # Default to first checking account if no account specified
+                    checking = next(
+                        (a for a in accounts if not a["is_credit"]), None
+                    )
+                    if checking:
+                        account_balances[checking["id"]] += event.amount
 
-            # Show payments (combine CC min + extra)
-            for event in required_events:
+                transactions.append(
+                    {
+                        "date": current_date,
+                        "action": f"Income: {description}",
+                        "amount": event.amount,
+                        "balances": dict(account_balances),
+                    }
+                )
+
+        # Process bill payments (non-credit)
+        processed_cc_payments = set()
+        for event in day_data.events:
+            if event.required and event.amount < 0:
                 # Check if this is a CC payment
                 is_cc_payment = False
                 for cc_id, cc in cards_due_today.items():
-                    if f"CC Min Payment: {cc.name}" in event.description:
+                    if (
+                        f"CC Min Payment: {cc.name}" in event.description
+                        and cc_id not in processed_cc_payments
+                    ):
                         min_payment = cc_min_payments[cc_id]
                         extra_payment = safe_payments.get(cc_id, 0)
                         total_payment = min_payment + extra_payment
 
+                        # Deduct from payment account
+                        payment_account = cc.payment_account
+                        if payment_account and payment_account in account_balances:
+                            account_balances[payment_account] -= total_payment
+                        else:
+                            # Default to first checking account
+                            checking = next(
+                                (a for a in accounts if not a["is_credit"]), None
+                            )
+                            if checking:
+                                account_balances[checking["id"]] -= total_payment
+
+                        # Reduce credit card balance
+                        account_balances[cc_id] -= total_payment
+
                         if extra_payment > 0:
                             daily_savings = (extra_payment * cc.apr) / 365
-                            print(
-                                f"   💳 PAY: ${total_payment:,.2f} to {cc.name} (${min_payment:,.2f} min + ${extra_payment:,.2f} extra, saves ${daily_savings:.2f}/day)"
-                            )
+                            action = f"Pay {cc.name} (${min_payment:,.2f} min + ${extra_payment:,.2f} extra, saves ${daily_savings:.2f}/day)"
                         else:
-                            print(
-                                f"   💳 PAY: ${total_payment:,.2f} to {cc.name} (minimum payment)"
-                            )
+                            action = f"Pay {cc.name} (minimum)"
 
+                        transactions.append(
+                            {
+                                "date": current_date,
+                                "action": action,
+                                "amount": -total_payment,
+                                "balances": dict(account_balances),
+                            }
+                        )
                         is_cc_payment = True
+                        processed_cc_payments.add(cc_id)
                         break
 
                 # Not a CC payment, show as regular bill
@@ -212,12 +271,96 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
                         .replace("[AUTO]", "")
                         .strip()
                     )
-                    autopay = "[AUTO]" if "[AUTO]" in event.description else ""
-                    print(f"   💳 PAY: ${-event.amount:,.2f} - {description} {autopay}")
+                    autopay = " [AUTO]" if "[AUTO]" in event.description else ""
 
-            # Show emergency fund savings
-            if emergency_fund_payment > 0:
-                print(f"   🏦 SAVE: ${emergency_fund_payment:,.2f} to Emergency Fund")
+                    # Deduct from payment account
+                    payment_account = event.account_id
+                    if payment_account and payment_account in account_balances:
+                        account_balances[payment_account] -= abs(event.amount)
+                    else:
+                        # Default to first checking account
+                        checking = next(
+                            (a for a in accounts if not a["is_credit"]), None
+                        )
+                        if checking:
+                            account_balances[checking["id"]] -= abs(event.amount)
+
+                    transactions.append(
+                        {
+                            "date": current_date,
+                            "action": f"Bill: {description}{autopay}",
+                            "amount": event.amount,
+                            "balances": dict(account_balances),
+                        }
+                    )
+
+        # Add emergency fund transfer if applicable
+        if emergency_fund_payment > 0:
+            # Find savings account
+            savings_account = next(
+                (
+                    a["id"]
+                    for a in accounts
+                    if a["name"].lower().find("savings") >= 0
+                    or a["name"].lower().find("emergency") >= 0
+                ),
+                None,
+            )
+            checking_account = next(
+                (a["id"] for a in accounts if not a["is_credit"]), None
+            )
+
+            if savings_account and checking_account:
+                account_balances[checking_account] -= emergency_fund_payment
+                account_balances[savings_account] += emergency_fund_payment
+
+                transactions.append(
+                    {
+                        "date": current_date,
+                        "action": "Transfer to Emergency Fund",
+                        "amount": -emergency_fund_payment,
+                        "balances": dict(account_balances),
+                    }
+                )
+
+    # Print table header
+    print("Date       Action                              Amount      ", end="")
+    for acc in accounts:
+        # Truncate account names to 12 chars
+        name = acc["name"][:12].ljust(12)
+        print(f"{name} ", end="")
+    print()
+    print("-" * (60 + 13 * len(accounts)))
+
+    # Print transactions
+    for txn in transactions:
+        date_str = txn["date"].strftime("%a %m/%d")
+        action = txn["action"][:35].ljust(35)
+
+        # Format amount
+        if txn["amount"] is None:
+            amount_str = "".ljust(12)
+        elif txn["amount"] >= 0:
+            amount_str = f"+${txn['amount']:>9,.2f}"
+        else:
+            amount_str = f"-${abs(txn['amount']):>9,.2f}"
+
+        print(f"{date_str} {action} {amount_str} ", end="")
+
+        # Print account balances (credit cards shown as negative)
+        for acc in accounts:
+            balance = txn["balances"].get(acc["id"], 0)
+            if acc["is_credit"]:
+                # Show credit card debt as negative
+                if balance > 0:
+                    balance_str = f"-${balance:>9,.2f}"
+                else:
+                    balance_str = "$0.00".rjust(12)
+            else:
+                balance_str = f"${balance:>10,.2f}"
+
+            print(f"{balance_str} ", end="")
+        print()
 
     print()
 
