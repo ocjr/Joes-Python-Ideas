@@ -7,6 +7,12 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 
+[manifest]
+members = [
+    "ideas",
+    "joes-financial-tool",
+]
+
 [[package]]
 name = "contourpy"
 version = "1.3.2"
@@ -246,6 +252,17 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "pandas", specifier = ">=2.3.3" },
 ]
+
+[[package]]
+name = "joes-financial-tool"
+version = "0.1.0"
+source = { virtual = "joes-financial-tool" }
+dependencies = [
+    { name = "pandas" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pandas", specifier = ">=2.3.3" }]
 
 [[package]]
 name = "kiwisolver"
