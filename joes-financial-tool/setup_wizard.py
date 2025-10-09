@@ -187,8 +187,8 @@ def setup_income():
     return income_sources
 
 
-def setup_bills():
-    """Set up recurring bills."""
+def setup_bills(accounts, credit_cards):
+    """Set up recurring bills with payment source."""
     print_header("Step 3: Recurring Bills")
     print("Let's set up your recurring bills and expenses.\n")
 
@@ -217,6 +217,27 @@ def setup_bills():
             allow_cancel=True
         )
 
+        # Ask which account or credit card pays for this
+        print("\nHow do you pay this bill?")
+        payment_sources = []
+
+        # Add accounts
+        for acc in accounts:
+            payment_sources.append((acc.id, f"Account: {acc.name}", False))
+
+        # Add credit cards
+        for cc in credit_cards:
+            payment_sources.append((cc.id, f"Credit Card: {cc.name}", True))
+
+        if payment_sources:
+            source_labels = [label for _, label, _ in payment_sources]
+            selected_label = get_choice("Select payment source:", source_labels)
+            selected_idx = source_labels.index(selected_label)
+            payment_account, _, paid_by_credit = payment_sources[selected_idx]
+        else:
+            payment_account = None
+            paid_by_credit = False
+
         # Create bill ID from name
         bill_id = name.lower().replace(' ', '_')
 
@@ -227,12 +248,14 @@ def setup_bills():
             due_day=due_day,
             frequency=Frequency(frequency),
             autopay=autopay,
-            payment_account=None,
-            category=category
+            payment_account=payment_account,
+            category=category,
+            paid_by_credit=paid_by_credit
         ))
 
         autopay_str = " [AUTOPAY]" if autopay else ""
-        print(f"\n✓ Added {name}: ${amount:,.2f} on day {due_day}{autopay_str}")
+        payment_str = f" via {payment_account}" if payment_account else ""
+        print(f"\n✓ Added {name}: ${amount:,.2f} on day {due_day}{autopay_str}{payment_str}")
 
         if not get_input("\nAdd another bill? (y/n)", default="n", input_type=bool):
             break
@@ -343,8 +366,8 @@ def run_setup_wizard(output_path: str = "financial_config.json"):
     print("This wizard will guide you through setting up:")
     print("  1. Bank accounts")
     print("  2. Income sources")
-    print("  3. Recurring bills")
-    print("  4. Credit cards")
+    print("  3. Credit cards")
+    print("  4. Recurring bills (with payment sources)")
     print("  5. Optimization settings\n")
 
     if not get_input("Ready to begin? (y/n)", default="y", input_type=bool):
@@ -352,11 +375,11 @@ def run_setup_wizard(output_path: str = "financial_config.json"):
         return False
 
     try:
-        # Run through all setup steps
+        # Run through all setup steps in correct order
         accounts = setup_accounts()
         income = setup_income()
-        bills = setup_bills()
         credit_cards = setup_credit_cards()
+        bills = setup_bills(accounts, credit_cards)  # Pass accounts and cards
         settings = setup_settings()
 
         # Create config
@@ -518,6 +541,27 @@ def add_bill_to_config(config_path: str = "financial_config.json"):
         allow_cancel=True
     )
 
+    # Ask which account or credit card pays for this
+    print("\nHow do you pay this bill?")
+    payment_sources = []
+
+    # Add accounts
+    for acc in config.accounts:
+        payment_sources.append((acc.id, f"Account: {acc.name}", False))
+
+    # Add credit cards
+    for cc in config.credit_cards:
+        payment_sources.append((cc.id, f"Credit Card: {cc.name}", True))
+
+    if payment_sources:
+        source_labels = [label for _, label, _ in payment_sources]
+        selected_label = get_choice("Select payment source:", source_labels)
+        selected_idx = source_labels.index(selected_label)
+        payment_account, _, paid_by_credit = payment_sources[selected_idx]
+    else:
+        payment_account = None
+        paid_by_credit = False
+
     bill_id = name.lower().replace(' ', '_')
 
     new_bill = Bill(
@@ -527,8 +571,9 @@ def add_bill_to_config(config_path: str = "financial_config.json"):
         due_day=due_day,
         frequency=Frequency(frequency),
         autopay=autopay,
-        payment_account=None,
-        category=category
+        payment_account=payment_account,
+        category=category,
+        paid_by_credit=paid_by_credit
     )
 
     config.bills.append(new_bill)

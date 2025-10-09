@@ -69,8 +69,9 @@ class Bill:
     due_day: int
     frequency: Frequency = Frequency.MONTHLY
     autopay: bool = False
-    payment_account: Optional[str] = None
+    payment_account: Optional[str] = None  # Account ID or credit card ID
     category: Optional[str] = None
+    paid_by_credit: bool = False  # True if payment_account is a credit card
 
     def __post_init__(self):
         if isinstance(self.frequency, str):

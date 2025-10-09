@@ -103,6 +103,36 @@ class FinancialOptimizer:
         """Calculate current emergency fund (savings accounts)."""
         return sum(acc.balance for acc in self.config.accounts if acc.type.value == "savings")
 
+    def calculate_credit_card_spending(self, card_id: str, days_ahead: int = 30) -> float:
+        """Calculate upcoming bills that will be charged to a credit card."""
+        total_spending = 0.0
+        end_date = self.today + timedelta(days=days_ahead)
+
+        for bill in self.config.bills:
+            if bill.paid_by_credit and bill.payment_account == card_id:
+                # Get all occurrences of this bill within the time period
+                next_due = self.get_next_date(bill.due_day)
+
+                while next_due <= end_date:
+                    total_spending += bill.amount
+
+                    if bill.frequency == Frequency.MONTHLY:
+                        next_due = self.get_next_date(bill.due_day, next_due + timedelta(days=1))
+                    elif bill.frequency == Frequency.QUARTERLY:
+                        # Move forward 3 months
+                        next_month = next_due.month + 3
+                        next_year = next_due.year
+                        while next_month > 12:
+                            next_month -= 12
+                            next_year += 1
+                        next_due = date(next_year, next_month, min(bill.due_day, monthrange(next_year, next_month)[1]))
+                    elif bill.frequency == Frequency.ANNUAL:
+                        next_due = next_due.replace(year=next_due.year + 1)
+                    else:
+                        break
+
+        return total_spending
+
     def get_upcoming_bills(self, days_ahead: int = 30) -> List[tuple[date, Bill]]:
         """Get all bills due within the next N days."""
         upcoming = []
@@ -184,9 +214,10 @@ class FinancialOptimizer:
                         account_id=inc.deposit_account
                     ))
 
-            # Add bill payments (including autopay)
+            # Add bill payments (only those paid from checking/savings, not credit)
             for bill_date, bill in self.get_upcoming_bills(days_ahead=days_ahead):
-                if bill_date == current_date:
+                if bill_date == current_date and not bill.paid_by_credit:
+                    # Only deduct from cash flow if paid from checking/savings
                     daily.events.append(CashFlowEvent(
                         date=current_date,
                         amount=-bill.amount,
@@ -362,28 +393,81 @@ class FinancialOptimizer:
         """Get detailed cash flow forecast."""
         return self.build_cash_flow_timeline(days_ahead=days)
 
-    def generate_weekly_summary(self) -> dict:
-        """Generate a 7-day financial summary with cash flow timeline."""
-        timeline = self.build_cash_flow_timeline(days_ahead=7)
+    def generate_monthly_action_plan(self) -> dict:
+        """Generate action-focused monthly financial plan."""
+        # Calculate checking vs savings totals
+        checking_total = sum(acc.balance for acc in self.config.accounts if acc.type.value == "checking")
+        savings_total = sum(acc.balance for acc in self.config.accounts if acc.type.value == "savings")
+        cash_total = sum(acc.balance for acc in self.config.accounts if acc.type.value == "cash")
 
-        summary = {
-            'current_date': self.today,
-            'total_balance': sum(acc.balance for acc in self.config.accounts),
-            'total_debt': sum(cc.balance for cc in self.config.credit_cards),
-            'emergency_fund': self.calculate_emergency_fund(),
-            'min_balance_required': sum(acc.minimum_balance for acc in self.config.accounts),
-            'timeline': timeline,
-            'credit_card_status': [
-                {
-                    'name': cc.name,
-                    'balance': cc.balance,
-                    'utilization': cc.utilization,
-                    'next_due': self.get_next_date(cc.due_day),
+        # Get monthly income
+        monthly_income = []
+        for inc_date, inc in self.get_upcoming_income(days_ahead=30):
+            monthly_income.append({
+                'date': inc_date,
+                'source': inc.source,
+                'amount': inc.amount
+            })
+        total_income = sum(inc['amount'] for inc in monthly_income)
+
+        # Calculate credit card actions with spending
+        cc_actions = []
+        total_cc_payments = 0
+        for cc in self.config.credit_cards:
+            cc_due = self.get_next_date(cc.due_day)
+            upcoming_spending = self.calculate_credit_card_spending(cc.id, days_ahead=30)
+
+            # Recommended payment = minimum + any extra we can afford + upcoming spending
+            # This prevents new debt from accumulating
+            recommended_payment = cc.minimum_payment + upcoming_spending
+
+            # Add safe extra payment if available
+            safe_extra = self.calculate_safe_payment_amount().get(cc.id, 0)
+            if safe_extra > 0:
+                recommended_payment += safe_extra
+
+            if cc.balance > 0 or upcoming_spending > 0:
+                cc_actions.append({
+                    'card_name': cc.name,
+                    'due_date': cc_due,
+                    'current_balance': cc.balance,
+                    'upcoming_spending': upcoming_spending,
                     'minimum_payment': cc.minimum_payment,
-                    'daily_interest': cc.daily_interest,
-                    'monthly_interest': cc.daily_interest * 30
-                }
-                for cc in self.config.credit_cards
-            ]
+                    'recommended_payment': min(recommended_payment, cc.balance + upcoming_spending),
+                    'apr': cc.apr
+                })
+                total_cc_payments += min(recommended_payment, cc.balance + upcoming_spending)
+
+        # Get bills paid from checking
+        checking_bills = []
+        total_bill_payments = 0
+        for bill_date, bill in self.get_upcoming_bills(days_ahead=30):
+            if not bill.paid_by_credit:
+                checking_bills.append({
+                    'date': bill_date,
+                    'name': bill.name,
+                    'amount': bill.amount,
+                    'autopay': bill.autopay
+                })
+                total_bill_payments += bill.amount
+
+        # Emergency fund status
+        emergency_fund = self.calculate_emergency_fund()
+        emergency_target = self.config.settings.emergency_fund_target
+
+        return {
+            'current_date': self.today,
+            'checking_balance': checking_total,
+            'savings_balance': savings_total,
+            'cash_balance': cash_total,
+            'total_debt': sum(cc.balance for cc in self.config.credit_cards),
+            'emergency_fund': emergency_fund,
+            'emergency_target': emergency_target,
+            'emergency_pct': (emergency_fund / emergency_target * 100) if emergency_target > 0 else 0,
+            'monthly_income': monthly_income,
+            'total_income': total_income,
+            'cc_actions': sorted(cc_actions, key=lambda x: x['due_date']),
+            'checking_bills': sorted(checking_bills, key=lambda x: x['date']),
+            'total_outflows': total_cc_payments + total_bill_payments,
+            'net_monthly': total_income - (total_cc_payments + total_bill_payments)
         }
-        return summary

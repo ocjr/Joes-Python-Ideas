@@ -49,7 +49,8 @@
       "frequency": "monthly",
       "autopay": false,
       "payment_account": "checking_main",
-      "category": "housing"
+      "category": "housing",
+      "paid_by_credit": false
     },
     {
       "id": "electric",
@@ -58,8 +59,9 @@
       "due_day": 15,
       "frequency": "monthly",
       "autopay": true,
-      "payment_account": "checking_main",
-      "category": "utilities"
+      "payment_account": "cc_visa",
+      "category": "utilities",
+      "paid_by_credit": true
     },
     {
       "id": "internet",
@@ -68,8 +70,9 @@
       "due_day": 10,
       "frequency": "monthly",
       "autopay": true,
-      "payment_account": "checking_main",
-      "category": "utilities"
+      "payment_account": "cc_visa",
+      "category": "utilities",
+      "paid_by_credit": true
     },
     {
       "id": "phone",
@@ -79,7 +82,8 @@
       "frequency": "monthly",
       "autopay": false,
       "payment_account": "checking_main",
-      "category": "utilities"
+      "category": "utilities",
+      "paid_by_credit": false
     },
     {
       "id": "car_insurance",
@@ -89,7 +93,8 @@
       "frequency": "monthly",
       "autopay": true,
       "payment_account": "checking_main",
-      "category": "insurance"
+      "category": "insurance",
+      "paid_by_credit": false
     },
     {
       "id": "streaming",
@@ -98,8 +103,9 @@
       "due_day": 12,
       "frequency": "monthly",
       "autopay": true,
-      "payment_account": "checking_main",
-      "category": "subscriptions"
+      "payment_account": "cc_mastercard",
+      "category": "subscriptions",
+      "paid_by_credit": true
     }
   ],
   "credit_cards": [
