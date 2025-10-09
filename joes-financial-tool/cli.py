@@ -142,7 +142,29 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
         required_events = [e for e in day_data.events if e.required and e.amount < 0]
         income_events = [e for e in day_data.events if e.amount > 0]
 
-        if required_events or income_events:
+        # Check if any credit cards are due today (for extra payments)
+        cards_due_today = []
+        for cc in optimizer.config.credit_cards:
+            if cc.balance > 0:
+                cc_due = optimizer.get_next_date(cc.due_day)
+                if cc_due == current_date:
+                    cards_due_today.append(cc)
+
+        # Calculate extra payments for cards due today
+        extra_payments = {}
+        if cards_due_today:
+            safe_payments = optimizer.calculate_safe_payment_amount()
+            emergency_fund_payment = safe_payments.get('emergency_fund', 0)
+
+            for cc in cards_due_today:
+                if cc.id in safe_payments:
+                    extra_payments[cc.id] = {
+                        'amount': safe_payments[cc.id],
+                        'card': cc
+                    }
+
+        # Show this day if there's anything happening
+        if required_events or income_events or extra_payments:
             print(f"\n📅 {current_date.strftime('%a %b %d')} ({day_label})")
 
             for event in income_events:
@@ -150,6 +172,17 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
 
             for event in required_events:
                 print(f"   💳 PAY: ${-event.amount:,.2f} - {event.description}")
+
+            # Show extra payment recommendations
+            if cards_due_today and safe_payments:
+                if emergency_fund_payment > 0:
+                    print(f"   🏦 SAVE: ${emergency_fund_payment:,.2f} to Emergency Fund")
+
+                for cc_id, payment_info in extra_payments.items():
+                    cc = payment_info['card']
+                    amount = payment_info['amount']
+                    daily_savings = (amount * cc.apr) / 365
+                    print(f"   💳 EXTRA: ${amount:,.2f} to {cc.name} (saves ${daily_savings:.2f}/day)")
 
     print()
 
