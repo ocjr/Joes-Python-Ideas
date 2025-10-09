@@ -18,7 +18,8 @@ from edit_wizard import (
     edit_account, edit_income, edit_bill, edit_credit_card
 )
 from config_manager import (
-    get_dated_config_name, select_config_interactive, list_config_files
+    get_dated_config_name, select_config_interactive, list_config_files,
+    get_most_recent_config
 )
 
 
@@ -146,79 +147,52 @@ def print_cash_flow_forecast(optimizer: FinancialOptimizer):
 
 
 def print_summary(optimizer: FinancialOptimizer):
-    """Print action-focused monthly summary."""
-    print_header("Monthly Action Plan")
+    """Print concise monthly financial summary."""
+    print_header("Monthly Financial Summary")
 
     plan = optimizer.generate_monthly_action_plan()
 
     print(f"📅 As of: {plan['current_date'].strftime('%B %d, %Y')}\n")
 
-    # Summary balances
-    print("💰 CURRENT POSITION:")
-    print(f"   Checking: ${plan['checking_balance']:,.2f}")
-    print(f"   Savings:  ${plan['savings_balance']:,.2f}")
-    if plan['cash_balance'] > 0:
-        print(f"   Cash:     ${plan['cash_balance']:,.2f}")
-    print(f"   Debt:     ${plan['total_debt']:,.2f}")
+    # Current total balance
+    total_assets = plan['checking_balance'] + plan['savings_balance'] + plan['cash_balance']
+    net_worth = total_assets - plan['total_debt']
+
+    print("💰 BALANCE TODAY:")
+    print(f"   Total Assets: ${total_assets:,.2f}")
+    print(f"   Total Debt:   ${plan['total_debt']:,.2f}")
+    print(f"   Net Worth:    ${net_worth:,.2f}\n")
 
     # Emergency fund
     status = "✓" if plan['emergency_pct'] >= 100 else "⚠️ "
-    print(f"\n🏦 Emergency Fund: ${plan['emergency_fund']:,.2f} / ${plan['emergency_target']:,.2f} ({status} {plan['emergency_pct']:.0f}%)\n")
+    print(f"🏦 Emergency Fund: ${plan['emergency_fund']:,.2f} / ${plan['emergency_target']:,.2f} ({status} {plan['emergency_pct']:.0f}%)\n")
 
-    # Monthly cash flow
+    # Monthly outlook
     print("📊 MONTHLY OUTLOOK:")
     print(f"   Expected Income:   +${plan['total_income']:,.2f}")
     print(f"   Expected Outflows: -${plan['total_outflows']:,.2f}")
     net_symbol = "+" if plan['net_monthly'] >= 0 else ""
     print(f"   Net Cash Flow:     {net_symbol}${plan['net_monthly']:,.2f}\n")
 
-    # Credit card actions
-    if plan['cc_actions']:
-        print("💳 CREDIT CARD ACTIONS (Next 30 Days):\n")
-        for action in plan['cc_actions']:
-            days_until = (action['due_date'] - plan['current_date']).days
-            day_str = "TODAY" if days_until == 0 else f"in {days_until} days" if days_until > 0 else f"{-days_until} days overdue"
+    # Projected end of month
+    projected_assets = total_assets + plan['net_monthly']
+    # Estimate debt reduction (from extra payments in recommendations)
+    debt_reduction = sum(
+        action['recommended_payment'] - action['minimum_payment']
+        for action in plan.get('cc_actions', [])
+    )
+    projected_debt = max(0, plan['total_debt'] - debt_reduction)
+    projected_net_worth = projected_assets - projected_debt
 
-            print(f"   📅 {action['due_date'].strftime('%b %d')} ({day_str})")
-            print(f"      Pay ${action['recommended_payment']:,.2f} to {action['card_name']}")
+    print("📈 PROJECTED END OF MONTH:")
+    print(f"   Total Assets: ${projected_assets:,.2f}")
+    print(f"   Total Debt:   ${projected_debt:,.2f}")
+    print(f"   Net Worth:    ${projected_net_worth:,.2f}")
 
-            # Show breakdown
-            parts = []
-            if action['current_balance'] > 0:
-                parts.append(f"${action['current_balance']:,.2f} balance")
-            if action['upcoming_spending'] > 0:
-                parts.append(f"${action['upcoming_spending']:,.2f} upcoming bills")
-            extra = action['recommended_payment'] - action['minimum_payment'] - action['upcoming_spending']
-            if extra > 0:
-                parts.append(f"${extra:,.2f} extra")
-
-            if parts:
-                print(f"         ({' + '.join(parts)})")
-            print(f"         Minimum required: ${action['minimum_payment']:,.2f} | APR: {action['apr']*100:.1f}%")
-            print()
-
-    # Bills from checking
-    if plan['checking_bills']:
-        print("💰 BILLS FROM CHECKING (Next 30 Days):\n")
-        for bill in plan['checking_bills']:
-            days_until = (bill['date'] - plan['current_date']).days
-            day_str = "TODAY" if days_until == 0 else f"in {days_until} days" if days_until > 0 else f"{-days_until} days overdue"
-            autopay_str = " [AUTOPAY]" if bill['autopay'] else ""
-
-            print(f"   📅 {bill['date'].strftime('%b %d')} ({day_str})")
-            print(f"      Pay ${bill['amount']:,.2f} - {bill['name']}{autopay_str}")
-        print()
-
-    # Income expected
-    if plan['monthly_income']:
-        print("💵 EXPECTED INCOME (Next 30 Days):\n")
-        for income in plan['monthly_income']:
-            days_until = (income['date'] - plan['current_date']).days
-            day_str = "TODAY" if days_until == 0 else f"in {days_until} days"
-
-            print(f"   📅 {income['date'].strftime('%b %d')} ({day_str})")
-            print(f"      ${income['amount']:,.2f} from {income['source']}")
-        print()
+    # Show change
+    change = projected_net_worth - net_worth
+    change_symbol = "+" if change >= 0 else ""
+    print(f"   Change:       {change_symbol}${change:,.2f}\n")
 
 
 def print_accounts(optimizer: FinancialOptimizer):
@@ -529,6 +503,12 @@ Examples:
     )
 
     args = parser.parse_args()
+
+    # If no config specified, use the most recent one
+    if args.config == 'financial_config.json':
+        most_recent = get_most_recent_config()
+        if most_recent and Path(most_recent).exists():
+            args.config = most_recent
 
     # Determine mode: interactive vs argument
     has_arguments = any([

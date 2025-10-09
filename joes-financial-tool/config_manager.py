@@ -20,6 +20,28 @@ def get_default_config_name() -> str:
     return "financial_config.json"
 
 
+def get_most_recent_config(directory: str = ".") -> Optional[str]:
+    """
+    Get the most recent config file (by date in filename).
+
+    Returns:
+        Most recent config filename or 'financial_config.json' if no dated configs found
+    """
+    configs = list_config_files(directory)
+
+    if not configs:
+        return "financial_config.json"
+
+    # Configs are already sorted newest first
+    # Skip "financial_config.json" and get the first dated one
+    for filename, _ in configs:
+        if filename.startswith("financial_config_") and filename.endswith(".json"):
+            return filename
+
+    # Fall back to default
+    return "financial_config.json"
+
+
 def list_config_files(directory: str = ".") -> List[tuple[str, str]]:
     """
     List all financial config files in directory.
