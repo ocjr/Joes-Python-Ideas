@@ -328,6 +328,14 @@ class FinancialOptimizer:
                 action="review"
             ))
 
+        # Find the NEXT credit card due date (earliest)
+        next_cc_due_date = None
+        for cc in self.config.credit_cards:
+            if cc.balance > 0:
+                cc_due = self.get_next_date(cc.due_day)
+                if next_cc_due_date is None or cc_due < next_cc_due_date:
+                    next_cc_due_date = cc_due
+
         # Check if any credit cards are due today
         cards_due_today = {}  # cc.id -> cc object
         cc_min_payments = {}  # cc.id -> minimum payment amount
@@ -338,10 +346,11 @@ class FinancialOptimizer:
                     cards_due_today[cc.id] = cc
                     cc_min_payments[cc.id] = cc.minimum_payment
 
-        # Calculate extra payments if cards are due today
+        # Only calculate extra payments if today is the NEXT credit card due date
+        # This prevents recommending the same money multiple times
         safe_payments = {}
         emergency_fund_payment = 0
-        if cards_due_today:
+        if cards_due_today and target_date == next_cc_due_date:
             safe_payments = self.calculate_safe_payment_amount()
             emergency_fund_payment = safe_payments.get('emergency_fund', 0)
 

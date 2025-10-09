@@ -128,6 +128,14 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
 
     timeline = optimizer.get_cash_flow_forecast(days=days)
 
+    # Find the NEXT credit card due date to only show extra payments once
+    next_cc_due_date = None
+    for cc in optimizer.config.credit_cards:
+        if cc.balance > 0:
+            cc_due = optimizer.get_next_date(cc.due_day)
+            if next_cc_due_date is None or cc_due < next_cc_due_date:
+                next_cc_due_date = cc_due
+
     for day_offset in range(days):
         current_date = date.today() + timedelta(days=day_offset)
         if current_date not in timeline:
@@ -150,10 +158,10 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
                     cards_due_today[cc.id] = cc
                     cc_min_payments[cc.id] = cc.minimum_payment
 
-        # Calculate extra payments for cards due today
+        # Only calculate extra payments if this is the NEXT credit card due date
         safe_payments = {}
         emergency_fund_payment = 0
-        if cards_due_today:
+        if cards_due_today and current_date == next_cc_due_date:
             safe_payments = optimizer.calculate_safe_payment_amount()
             emergency_fund_payment = safe_payments.get('emergency_fund', 0)
 
@@ -207,6 +215,14 @@ def print_cash_flow_forecast(optimizer: FinancialOptimizer):
     print(f"{'Date':<12} {'Starting':<12} {'Events':<8} {'Ending':<12} {'Status':<10}")
     print("-" * 70)
 
+    # Find the NEXT credit card due date to only show extra payments once
+    next_cc_due_date = None
+    for cc in optimizer.config.credit_cards:
+        if cc.balance > 0:
+            cc_due = optimizer.get_next_date(cc.due_day)
+            if next_cc_due_date is None or cc_due < next_cc_due_date:
+                next_cc_due_date = cc_due
+
     # Track cumulative extra payments to adjust balances
     cumulative_extra = 0.0
 
@@ -224,10 +240,10 @@ def print_cash_flow_forecast(optimizer: FinancialOptimizer):
                     cards_due_today[cc.id] = cc
                     cc_min_payments[cc.id] = cc.minimum_payment
 
-        # Calculate extra payments for cards due today
+        # Only calculate extra payments if this is the NEXT credit card due date
         safe_payments = {}
         emergency_fund_payment = 0
-        if cards_due_today:
+        if cards_due_today and day_date == next_cc_due_date:
             safe_payments = optimizer.calculate_safe_payment_amount()
             emergency_fund_payment = safe_payments.get('emergency_fund', 0)
 
