@@ -1,0 +1,33 @@
+# Sensitive financial data - DO NOT COMMIT
+financial_config.json
+financial_config_*.json
+my_*.json
+*_personal.json
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.claude/
+
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -1,0 +1,195 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Financial Optimization Tool Config",
+  "type": "object",
+  "required": ["accounts", "income", "bills", "credit_cards"],
+  "properties": {
+    "accounts": {
+      "type": "array",
+      "description": "Bank accounts for managing money",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "type", "balance"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the account"
+          },
+          "name": {
+            "type": "string",
+            "description": "Account name or nickname"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["checking", "savings", "cash"],
+            "description": "Type of account"
+          },
+          "balance": {
+            "type": "number",
+            "description": "Current account balance"
+          },
+          "minimum_balance": {
+            "type": "number",
+            "description": "Minimum balance to maintain (optional)",
+            "default": 0
+          }
+        }
+      }
+    },
+    "income": {
+      "type": "array",
+      "description": "Income sources and paydays",
+      "items": {
+        "type": "object",
+        "required": ["id", "source", "amount", "frequency", "next_date"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for income source"
+          },
+          "source": {
+            "type": "string",
+            "description": "Income source name (e.g., 'Primary Job', 'Freelance')"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Amount received per payment"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": ["weekly", "biweekly", "semi-monthly", "monthly"],
+            "description": "How often income is received"
+          },
+          "next_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Next payment date (YYYY-MM-DD)"
+          },
+          "deposit_account": {
+            "type": "string",
+            "description": "Account ID where income is deposited"
+          }
+        }
+      }
+    },
+    "bills": {
+      "type": "array",
+      "description": "Recurring bills and expenses",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "amount", "due_day", "frequency"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the bill"
+          },
+          "name": {
+            "type": "string",
+            "description": "Bill name (e.g., 'Rent', 'Electric', 'Internet')"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Bill amount (can be average if variable)"
+          },
+          "due_day": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31,
+            "description": "Day of month bill is due"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": ["monthly", "quarterly", "annual"],
+            "description": "How often bill is due",
+            "default": "monthly"
+          },
+          "autopay": {
+            "type": "boolean",
+            "description": "Whether bill is on autopay",
+            "default": false
+          },
+          "payment_account": {
+            "type": "string",
+            "description": "Account ID to pay from"
+          },
+          "category": {
+            "type": "string",
+            "description": "Bill category (e.g., 'housing', 'utilities', 'subscriptions')"
+          }
+        }
+      }
+    },
+    "credit_cards": {
+      "type": "array",
+      "description": "Credit card accounts",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "balance", "credit_limit", "apr", "due_day", "minimum_payment"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the credit card"
+          },
+          "name": {
+            "type": "string",
+            "description": "Credit card name or nickname"
+          },
+          "balance": {
+            "type": "number",
+            "description": "Current balance owed"
+          },
+          "credit_limit": {
+            "type": "number",
+            "description": "Total credit limit"
+          },
+          "apr": {
+            "type": "number",
+            "description": "Annual Percentage Rate (as decimal, e.g., 0.1899 for 18.99%)"
+          },
+          "due_day": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31,
+            "description": "Day of month payment is due"
+          },
+          "minimum_payment": {
+            "type": "number",
+            "description": "Minimum payment amount"
+          },
+          "statement_day": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31,
+            "description": "Day of month statement closes"
+          },
+          "payment_account": {
+            "type": "string",
+            "description": "Account ID to pay from"
+          }
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "description": "Optimization settings and preferences",
+      "properties": {
+        "emergency_fund_target": {
+          "type": "number",
+          "description": "Target emergency fund amount",
+          "default": 1000
+        },
+        "planning_horizon_days": {
+          "type": "integer",
+          "description": "How many days ahead to plan",
+          "default": 30
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["avalanche", "snowball", "balanced"],
+          "description": "Debt payoff strategy (avalanche=highest interest first, snowball=lowest balance first)",
+          "default": "avalanche"
+        }
+      }
+    }
+  }
+}

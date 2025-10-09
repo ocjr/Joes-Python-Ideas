@@ -1,0 +1,145 @@
+{
+  "accounts": [
+    {
+      "id": "checking_main",
+      "name": "Main Checking",
+      "type": "checking",
+      "balance": 2500.00,
+      "minimum_balance": 500.00
+    },
+    {
+      "id": "savings_emergency",
+      "name": "Emergency Fund",
+      "type": "savings",
+      "balance": 800.00,
+      "minimum_balance": 0.00
+    },
+    {
+      "id": "cash",
+      "name": "Cash on Hand",
+      "type": "cash",
+      "balance": 150.00,
+      "minimum_balance": 0.00
+    }
+  ],
+  "income": [
+    {
+      "id": "paycheck_main",
+      "source": "Primary Job",
+      "amount": 2400.00,
+      "frequency": "biweekly",
+      "next_date": "2025-10-10",
+      "deposit_account": "checking_main"
+    },
+    {
+      "id": "freelance",
+      "source": "Freelance Work",
+      "amount": 500.00,
+      "frequency": "monthly",
+      "next_date": "2025-10-15",
+      "deposit_account": "checking_main"
+    }
+  ],
+  "bills": [
+    {
+      "id": "rent",
+      "name": "Rent",
+      "amount": 1200.00,
+      "due_day": 1,
+      "frequency": "monthly",
+      "autopay": false,
+      "payment_account": "checking_main",
+      "category": "housing"
+    },
+    {
+      "id": "electric",
+      "name": "Electric Bill",
+      "amount": 85.00,
+      "due_day": 15,
+      "frequency": "monthly",
+      "autopay": true,
+      "payment_account": "checking_main",
+      "category": "utilities"
+    },
+    {
+      "id": "internet",
+      "name": "Internet",
+      "amount": 60.00,
+      "due_day": 10,
+      "frequency": "monthly",
+      "autopay": true,
+      "payment_account": "checking_main",
+      "category": "utilities"
+    },
+    {
+      "id": "phone",
+      "name": "Phone Bill",
+      "amount": 45.00,
+      "due_day": 5,
+      "frequency": "monthly",
+      "autopay": false,
+      "payment_account": "checking_main",
+      "category": "utilities"
+    },
+    {
+      "id": "car_insurance",
+      "name": "Car Insurance",
+      "amount": 120.00,
+      "due_day": 20,
+      "frequency": "monthly",
+      "autopay": true,
+      "payment_account": "checking_main",
+      "category": "insurance"
+    },
+    {
+      "id": "streaming",
+      "name": "Streaming Services",
+      "amount": 25.00,
+      "due_day": 12,
+      "frequency": "monthly",
+      "autopay": true,
+      "payment_account": "checking_main",
+      "category": "subscriptions"
+    }
+  ],
+  "credit_cards": [
+    {
+      "id": "cc_visa",
+      "name": "Visa Card",
+      "balance": 1850.00,
+      "credit_limit": 5000.00,
+      "apr": 0.1899,
+      "due_day": 22,
+      "minimum_payment": 55.00,
+      "statement_day": 15,
+      "payment_account": "checking_main"
+    },
+    {
+      "id": "cc_mastercard",
+      "name": "MasterCard",
+      "balance": 650.00,
+      "credit_limit": 2000.00,
+      "apr": 0.2299,
+      "due_day": 8,
+      "minimum_payment": 25.00,
+      "statement_day": 1,
+      "payment_account": "checking_main"
+    },
+    {
+      "id": "cc_discover",
+      "name": "Discover Card",
+      "balance": 0.00,
+      "credit_limit": 3000.00,
+      "apr": 0.1599,
+      "due_day": 18,
+      "minimum_payment": 0.00,
+      "statement_day": 11,
+      "payment_account": "checking_main"
+    }
+  ],
+  "settings": {
+    "emergency_fund_target": 1000.00,
+    "planning_horizon_days": 30,
+    "priority": "avalanche"
+  }
+}
