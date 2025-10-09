@@ -323,44 +323,85 @@ def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
                     }
                 )
 
-    # Print table header
-    print("Date       Action                              Amount      ", end="")
-    for acc in accounts:
-        # Truncate account names to 12 chars
-        name = acc["name"][:12].ljust(12)
-        print(f"{name} ", end="")
+    # Ask user for format preference
+    print("Display format:")
+    print("  1. Table (screen-friendly)")
+    print("  2. CSV (export-friendly)")
+    format_choice = input("\nSelect format (1-2, default 1): ").strip()
     print()
-    print("-" * (60 + 13 * len(accounts)))
 
-    # Print transactions
-    for txn in transactions:
-        date_str = txn["date"].strftime("%a %m/%d")
-        action = txn["action"][:35].ljust(35)
-
-        # Format amount
-        if txn["amount"] is None:
-            amount_str = "".ljust(12)
-        elif txn["amount"] >= 0:
-            amount_str = f"+${txn['amount']:>9,.2f}"
-        else:
-            amount_str = f"-${abs(txn['amount']):>9,.2f}"
-
-        print(f"{date_str} {action} {amount_str} ", end="")
-
-        # Print account balances (credit cards shown as negative)
+    if format_choice == "2":
+        # CSV format
+        print("Date,Action,Amount,", end="")
         for acc in accounts:
-            balance = txn["balances"].get(acc["id"], 0)
-            if acc["is_credit"]:
-                # Show credit card debt as negative
-                if balance > 0:
-                    balance_str = f"-${balance:>9,.2f}"
-                else:
-                    balance_str = "$0.00".rjust(12)
-            else:
-                balance_str = f"${balance:>10,.2f}"
-
-            print(f"{balance_str} ", end="")
+            print(f"{acc['name']},", end="")
         print()
+
+        for txn in transactions:
+            date_str = txn["date"].strftime("%Y-%m-%d")
+            action = txn["action"].replace(",", ";")  # Escape commas
+
+            # Format amount
+            if txn["amount"] is None:
+                amount_str = ""
+            else:
+                amount_str = f"{txn['amount']:.2f}"
+
+            print(f"{date_str},{action},{amount_str},", end="")
+
+            # Print account balances (credit cards shown as negative)
+            for acc in accounts:
+                balance = txn["balances"].get(acc["id"], 0)
+                if acc["is_credit"]:
+                    # Show credit card debt as negative
+                    if balance > 0:
+                        balance_str = f"-{balance:.2f}"
+                    else:
+                        balance_str = "0.00"
+                else:
+                    balance_str = f"{balance:.2f}"
+
+                print(f"{balance_str},", end="")
+            print()
+    else:
+        # Table format with pipes for better readability
+        print("Date      | Action                            | Amount      |", end="")
+        for acc in accounts:
+            # Truncate account names to 11 chars
+            name = acc["name"][:11].ljust(11)
+            print(f" {name} |", end="")
+        print()
+        print("-" * 10 + "+" + "-" * 36 + "+" + "-" * 13 + "+" + ("-" * 13 + "+") * len(accounts))
+
+        # Print transactions
+        for txn in transactions:
+            date_str = txn["date"].strftime("%a %m/%d")
+            action = txn["action"][:34].ljust(34)
+
+            # Format amount
+            if txn["amount"] is None:
+                amount_str = "".ljust(11)
+            elif txn["amount"] >= 0:
+                amount_str = f"+${txn['amount']:>8,.2f}"
+            else:
+                amount_str = f"-${abs(txn['amount']):>8,.2f}"
+
+            print(f"{date_str} | {action} | {amount_str} |", end="")
+
+            # Print account balances (credit cards shown as negative)
+            for acc in accounts:
+                balance = txn["balances"].get(acc["id"], 0)
+                if acc["is_credit"]:
+                    # Show credit card debt as negative
+                    if balance > 0:
+                        balance_str = f"-${balance:>8,.2f}"
+                    else:
+                        balance_str = "$0.00".rjust(11)
+                else:
+                    balance_str = f"${balance:>9,.2f}"
+
+                print(f" {balance_str} |", end="")
+            print()
 
     print()
 
