@@ -137,17 +137,24 @@ def print_optimal_simulation(optimizer: FinancialOptimizer, days: int = 30):
 
     # Display strategy selected
     print(f"\n✅ Selected Strategy: {optimal.strategy.value.upper().replace('_', ' ')}")
+
+    # Check if simulation failed
+    if optimal.failed:
+        print(f"\n❌ SIMULATION FAILED - Constraint violations detected")
+        print(f"   Completed {len(optimal.days)} days before failure")
+        if optimal.warnings:
+            print(f"\n   Violations:")
+            for warning in optimal.warnings[:5]:  # Show first 5 warnings
+                print(f"     - {warning}")
+            if len(optimal.warnings) > 5:
+                print(f"     ... and {len(optimal.warnings) - 5} more")
+        print(f"\n   ⚠️  This strategy would cause accounts to go negative.")
+        print(f"   Try a less aggressive approach or increase available cash.\n")
+        return
+
     print(f"💰 Total Interest Cost: ${optimal.total_interest_paid:.2f}")
     print(f"📉 Total Debt Reduction: ${optimal.get_total_debt_reduction():.2f}")
-
-    if optimal.warnings:
-        print(f"\n⚠️  Warnings: {len(optimal.warnings)} constraint violation(s)")
-        for warning in optimal.warnings[:5]:  # Show first 5 warnings
-            print(f"   - {warning}")
-        if len(optimal.warnings) > 5:
-            print(f"   ... and {len(optimal.warnings) - 5} more")
-    else:
-        print(f"\n✅ No constraint violations - all accounts stay above minimums")
+    print(f"\n✅ All constraints satisfied - no accounts go below minimums")
 
     # Show final state
     print(f"\n📊 Final State (Day {days}):")

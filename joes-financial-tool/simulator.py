@@ -104,6 +104,7 @@ class SimulationResult:
     total_interest_paid: float
     final_state: FinancialState
     warnings: list[str] = field(default_factory=list)
+    failed: bool = False  # True if simulation violated constraints
 
     def get_total_debt_reduction(self) -> float:
         """Calculate total debt paid off during simulation."""
@@ -308,13 +309,17 @@ class FinancialSimulator:
         available_checking = total_checking - min_balance_required
 
         # Look ahead to calculate how much checking we'll need for upcoming required transactions
+        # Be very conservative here to prevent any violations
         buffer_needed = 0.0
-        for future_txn in future_transactions[:10]:  # Look at next 10 transactions
+        for future_txn in future_transactions[
+            :20
+        ]:  # Look at next 20 transactions for better safety
             if future_txn.required and future_txn.amount < 0:
                 buffer_needed += abs(future_txn.amount)
 
-        # Adjust available checking for future needs (keep 50% buffer)
-        safe_checking = max(0, available_checking - (buffer_needed * 0.5))
+        # Adjust available checking for future needs (keep 75% buffer for extra safety)
+        # This ensures we have enough for most upcoming expenses
+        safe_checking = max(0, available_checking - (buffer_needed * 0.75))
 
         # Can we afford this from checking?
         can_afford_checking = safe_checking >= expense_amount
@@ -402,6 +407,35 @@ class FinancialSimulator:
                 total_interest += interest
         return total_interest
 
+    def check_constraints(self, state: FinancialState) -> tuple[bool, list[str]]:
+        """
+        Check if a financial state violates any constraints.
+
+        Returns
+        -------
+        tuple[bool, list[str]]
+            (is_valid, list of violation messages)
+        """
+        violations = []
+
+        # Check account minimum balances
+        for acc in self.config.accounts:
+            balance = state.account_balances.get(acc.id, 0)
+            if balance < acc.minimum_balance:
+                violations.append(
+                    f"{state.date}: {acc.name} below minimum (${balance:.2f} < ${acc.minimum_balance:.2f})"
+                )
+
+        # Check credit card limits
+        for cc in self.config.credit_cards:
+            balance = state.credit_card_balances.get(cc.id, 0)
+            if balance > cc.credit_limit:
+                violations.append(
+                    f"{state.date}: {cc.name} over limit (${balance:.2f} > ${cc.credit_limit:.2f})"
+                )
+
+        return (len(violations) == 0, violations)
+
     def calculate_extra_cc_payments(
         self,
         current_state: FinancialState,
@@ -443,6 +477,7 @@ class FinancialSimulator:
         available_checking = total_checking - min_balance_required
 
         # Calculate total required payments coming up (look 30 days ahead)
+        # Be VERY conservative - we need to ensure we NEVER go negative
         future_required_amount = 0.0
         future_income_amount = 0.0
         cutoff_date = current_date + timedelta(days=30)
@@ -455,9 +490,21 @@ class FinancialSimulator:
             elif txn.amount > 0:
                 future_income_amount += txn.amount
 
-        # Calculate safe amount = current available + future income - future required - buffer
-        safety_buffer = 500  # Always keep $500 buffer
+        # Calculate safe amount VERY conservatively
+        # We want: current + future_income - future_required - buffer > min_balance
+        # So safe = current - min_required + future_income - future_required - buffer
+        # Simplify: safe = available + future_net - buffer
+
+        # Use a large buffer to ensure we never violate constraints
+        # Include minimum balance in the buffer calculation
+        safety_buffer = max(
+            1000, min_balance_required * 1.5
+        )  # At least $1000 or 150% of min balance
+
         net_future_cash = future_income_amount - future_required_amount
+
+        # Safe amount = what we have available now + net future cash - safety buffer
+        # This ensures we maintain minimum balances plus extra cushion
         safe_amount = max(0, available_checking + net_future_cash - safety_buffer)
 
         # Don't make extra payments if we don't have significant cushion
@@ -677,6 +724,9 @@ class FinancialSimulator:
         interest = self.calculate_daily_interest(working_state)
         working_state.total_interest_paid += interest
 
+        # Note: Constraint checking is done at the simulation level, not here
+        # This allows us to try the entire day and see if it works
+
         return DaySimulation(
             date=current_state.date,
             starting_state=starting_state,
@@ -694,6 +744,7 @@ class FinancialSimulator:
 
         day_results = []
         warnings = []
+        failed = False
 
         for day_offset in range(days_ahead + 1):
             current_date = self.today + timedelta(days=day_offset)
@@ -708,13 +759,14 @@ class FinancialSimulator:
             day_sim = self.simulate_day(current_state, day_txns, future_txns, strategy)
             day_results.append(day_sim)
 
-            # Check for violations
-            for acc in self.config.accounts:
-                balance = day_sim.ending_state.account_balances.get(acc.id, 0)
-                if balance < acc.minimum_balance:
-                    warnings.append(
-                        f"{current_date}: {acc.name} below minimum (${balance:.2f} < ${acc.minimum_balance:.2f})"
-                    )
+            # Check for constraint violations
+            is_valid, violations = self.check_constraints(day_sim.ending_state)
+            if not is_valid:
+                # HARD FAIL - this simulation is invalid
+                warnings.extend(violations)
+                failed = True
+                # Stop the simulation - no point continuing with invalid state
+                break
 
             # Update state for next day
             current_state = day_sim.ending_state
@@ -726,23 +778,28 @@ class FinancialSimulator:
             total_interest_paid=current_state.total_interest_paid,
             final_state=current_state,
             warnings=warnings,
+            failed=failed,
         )
 
     def find_optimal_strategy(self, days_ahead: int = 30) -> SimulationResult:
-        """Run simulations for all strategies and return the one with lowest interest cost."""
+        """Run simulations for all strategies and return the one with lowest interest cost.
+
+        Only considers valid simulations (no constraint violations). If all simulations
+        fail, returns the one that made it furthest before failing.
+        """
         results = []
 
         for strategy in OptimizationStrategy:
             result = self.run_simulation(strategy, days_ahead)
             results.append(result)
 
-        # Find the one with lowest total interest paid and no critical warnings
-        # Filter out results with critical violations first
-        valid_results = [r for r in results if len(r.warnings) == 0]
+        # Filter out failed simulations
+        valid_results = [r for r in results if not r.failed]
 
         if not valid_results:
-            # All have violations, pick the one with fewest warnings
-            valid_results = sorted(results, key=lambda r: len(r.warnings))
+            # All simulations failed - return the one that made it furthest
+            # (most days completed before failure)
+            return max(results, key=lambda r: len(r.days))
 
         # Among valid results, pick the one with lowest interest
         optimal = min(valid_results, key=lambda r: r.total_interest_paid)
