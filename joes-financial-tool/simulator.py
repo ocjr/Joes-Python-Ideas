@@ -529,6 +529,84 @@ class FinancialSimulator:
 
         return (len(violations) == 0, violations)
 
+    def calculate_preemptive_cc_payments(
+        self,
+        current_state: FinancialState,
+        current_date: date,
+        day_transactions: list[PlannedTransaction],
+    ) -> list[PlannedTransaction]:
+        """
+        Calculate preemptive CC payments needed to prevent exceeding credit limits.
+
+        If a bill will be charged to a credit card today and that would exceed the limit,
+        make a payment to the card first to create room.
+
+        Parameters
+        ----------
+        current_state : FinancialState
+            Current financial state
+        current_date : date
+            Current date
+        day_transactions : list[PlannedTransaction]
+            Transactions for today
+
+        Returns
+        -------
+        list[PlannedTransaction]
+            Payment transactions to make room on credit cards
+        """
+        preemptive_payments = []
+
+        # Find all bills that will be charged to credit cards today
+        bills_on_credit = [
+            txn for txn in day_transactions if txn.category == "bill_on_credit"
+        ]
+
+        for bill_txn in bills_on_credit:
+            cc_id = bill_txn.preferred_account
+            if not cc_id:
+                continue
+
+            # Find the credit card
+            cc = next(
+                (c for c in self.config.credit_cards if c.id == cc_id),
+                None,
+            )
+            if not cc:
+                continue
+
+            # Check current balance and what it would be after charging the bill
+            current_balance = current_state.credit_card_balances.get(cc_id, 0)
+            bill_amount = abs(bill_txn.amount)
+            balance_after_bill = current_balance + bill_amount
+
+            # If this would exceed the limit, we need to make a payment first
+            if balance_after_bill > cc.credit_limit:
+                # Calculate how much we need to pay to make room
+                amount_needed = balance_after_bill - cc.credit_limit
+
+                # Add a small buffer (5% or $10, whichever is more) to be safe
+                buffer = max(10, amount_needed * 0.05)
+                payment_amount = amount_needed + buffer
+
+                # Don't pay more than the current balance
+                payment_amount = min(payment_amount, current_balance)
+
+                if payment_amount > 0:
+                    preemptive_payments.append(
+                        PlannedTransaction(
+                            date=current_date,
+                            description=f"CC Preemptive Payment: {cc.name} ({cc.id}) to make room for {bill_txn.description}",
+                            amount=-payment_amount,
+                            category="cc_preemptive_payment",
+                            required=True,  # This is required to prevent exceeding limit
+                            preferred_account=cc.payment_account,
+                            can_use_credit=False,
+                        )
+                    )
+
+        return preemptive_payments
+
     def calculate_extra_cc_payments(
         self,
         current_state: FinancialState,
@@ -674,6 +752,54 @@ class FinancialSimulator:
         working_state = deepcopy(current_state)
         processed = []
 
+        # FIRST: Check if we need to make preemptive CC payments to prevent exceeding limits
+        preemptive_payments = self.calculate_preemptive_cc_payments(
+            working_state, current_state.date, day_transactions
+        )
+
+        # Process preemptive payments first
+        for preemptive_txn in preemptive_payments:
+            decision = self.decide_payment_method(
+                preemptive_txn, working_state, all_future_transactions, strategy
+            )
+
+            # Apply preemptive payment (always from checking to CC)
+            if decision.method == PaymentMethod.CHECKING:
+                acc_id = decision.checking_account_id
+                if not acc_id:
+                    checking_accounts = [
+                        acc
+                        for acc in self.config.accounts
+                        if acc.type.value == "checking"
+                    ]
+                    if checking_accounts:
+                        acc_id = checking_accounts[0].id
+
+                if acc_id:
+                    working_state.account_balances[acc_id] -= decision.checking_amount
+
+                # Reduce CC balance
+                # Extract CC ID from description
+                if (
+                    "(" in preemptive_txn.description
+                    and ")" in preemptive_txn.description
+                ):
+                    # Parse description to get CC name, then find ID
+                    desc_parts = preemptive_txn.description.split(":")
+                    if len(desc_parts) > 1:
+                        cc_name = desc_parts[1].split("(")[0].strip()
+                        cc = next(
+                            (c for c in self.config.credit_cards if c.name == cc_name),
+                            None,
+                        )
+                        if cc:
+                            working_state.credit_card_balances[
+                                cc.id
+                            ] -= decision.checking_amount
+
+            processed.append((preemptive_txn, decision))
+
+        # THEN: Process regular day transactions
         for txn in day_transactions:
             # Skip CC payments if card has $0 balance (already paid off)
             if (
@@ -715,7 +841,9 @@ class FinancialSimulator:
                 # Expense - apply according to decision
                 # Special case: CC payments reduce debt instead of increasing it
                 is_cc_payment = (
-                    txn.category == "cc_payment" or txn.category == "cc_extra_payment"
+                    txn.category == "cc_payment"
+                    or txn.category == "cc_extra_payment"
+                    or txn.category == "cc_preemptive_payment"
                 )
 
                 # Special case: Bills on credit just add to CC balance

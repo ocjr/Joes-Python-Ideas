@@ -142,12 +142,51 @@ def print_optimal_simulation(optimizer: FinancialOptimizer, days: int = 30):
     if optimal.failed:
         print(f"\n❌ SIMULATION FAILED - Constraint violations detected")
         print(f"   Completed {len(optimal.days)} days before failure")
+
         if optimal.warnings:
             print(f"\n   Violations:")
             for warning in optimal.warnings[:5]:  # Show first 5 warnings
                 print(f"     - {warning}")
             if len(optimal.warnings) > 5:
                 print(f"     ... and {len(optimal.warnings) - 5} more")
+
+        # Show the state when it failed
+        if optimal.days:
+            last_day = optimal.days[-1]
+            print(f"\n   📊 Account Balances at Failure (Day {len(optimal.days)}):")
+
+            # Show checking accounts
+            for acc in optimizer.config.accounts:
+                if acc.type.value == "checking":
+                    balance = last_day.ending_state.account_balances.get(acc.id, 0)
+                    status = "✓" if balance >= acc.minimum_balance else "❌"
+                    print(
+                        f"     {status} {acc.name}: ${balance:.2f} (min ${acc.minimum_balance:.2f})"
+                    )
+
+            # Show credit cards
+            for cc in optimizer.config.credit_cards:
+                balance = last_day.ending_state.credit_card_balances.get(cc.id, 0)
+                status = "✓" if balance <= cc.credit_limit else "❌"
+                print(
+                    f"     {status} {cc.name}: ${balance:.2f} / ${cc.credit_limit:.2f} limit"
+                )
+
+            # Show what transactions were attempted on the failure day
+            if last_day.transactions:
+                print(
+                    f"\n   📋 Transactions on Failure Day ({last_day.date.strftime('%a %m/%d')}):"
+                )
+                for txn, decision in last_day.transactions:
+                    if txn.amount != 0:
+                        amount_str = f"${abs(txn.amount):.2f}"
+                        if txn.amount > 0:
+                            print(f"     ✓ {txn.description}: +{amount_str}")
+                        else:
+                            print(f"     • {txn.description}: -{amount_str}")
+                            if decision.reason:
+                                print(f"       → {decision.reason}")
+
         print(f"\n   ⚠️  This strategy would cause accounts to go negative.")
         print(f"   Try a less aggressive approach or increase available cash.\n")
         return
