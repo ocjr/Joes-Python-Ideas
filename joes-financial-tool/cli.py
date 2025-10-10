@@ -48,7 +48,7 @@ def print_menu(current_config: str = "financial_config.json"):
     print("Main Menu:\n")
     print("  VIEW:")
     print("    1. 📋 Today's Actions")
-    print("    2. 📅 Action Plan (custom days)")
+    print("    2. 🎯 Optimal Simulation (custom days)")
     print("    3. 📊 Financial Summary")
     print("    4. 📈 14-Day Cash Flow Forecast")
     print("    5. 🏦 Account Details")
@@ -224,11 +224,14 @@ def print_optimal_simulation(optimizer: FinancialOptimizer, days: int = 30):
     print(f"   Total Savings:  ${optimal.final_state.get_total_savings():.2f}")
     print(f"   Total Debt:     ${optimal.final_state.get_total_debt():.2f}")
 
-    # Show key transactions
-    print(f"\n📋 Key Transactions (next 7 days):")
-    for day in optimal.days[:7]:
-        if day.transactions:
-            print(f"\n   {day.date.strftime('%a %m/%d')}:")
+    # Show key transactions for the requested number of days
+    days_to_show = min(days, len(optimal.days))
+    print(f"\n📋 Day-by-Day Transactions (next {days_to_show} days):")
+    for day in optimal.days[:days_to_show]:
+        print(f"\n   {day.date.strftime('%a %m/%d')}:")
+        if not day.transactions or all(txn.amount == 0 for txn, _ in day.transactions):
+            print(f"      (no transactions)")
+        else:
             for txn, decision in day.transactions:
                 if txn.amount != 0:
                     amount_str = f"${abs(txn.amount):.2f}"
