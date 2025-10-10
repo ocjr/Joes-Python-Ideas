@@ -127,6 +127,59 @@ def print_tasks(optimizer: FinancialOptimizer, target_date: date = None):
     print()
 
 
+def print_optimal_simulation(optimizer: FinancialOptimizer, days: int = 30):
+    """Display the optimal financial strategy simulation."""
+    print_header(f"🎯 Optimal {days}-Day Financial Strategy")
+
+    # Get the optimal simulation
+    print("⏳ Running simulations to find optimal strategy...")
+    optimal = optimizer.get_optimal_simulation(days_ahead=days)
+
+    # Display strategy selected
+    print(f"\n✅ Selected Strategy: {optimal.strategy.value.upper().replace('_', ' ')}")
+    print(f"💰 Total Interest Cost: ${optimal.total_interest_paid:.2f}")
+    print(f"📉 Total Debt Reduction: ${optimal.get_total_debt_reduction():.2f}")
+
+    if optimal.warnings:
+        print(f"\n⚠️  Warnings: {len(optimal.warnings)} constraint violation(s)")
+        for warning in optimal.warnings[:5]:  # Show first 5 warnings
+            print(f"   - {warning}")
+        if len(optimal.warnings) > 5:
+            print(f"   ... and {len(optimal.warnings) - 5} more")
+    else:
+        print(f"\n✅ No constraint violations - all accounts stay above minimums")
+
+    # Show final state
+    print(f"\n📊 Final State (Day {days}):")
+    print(f"   Total Checking: ${optimal.final_state.get_total_checking():.2f}")
+    print(f"   Total Savings:  ${optimal.final_state.get_total_savings():.2f}")
+    print(f"   Total Debt:     ${optimal.final_state.get_total_debt():.2f}")
+
+    # Show key transactions
+    print(f"\n📋 Key Transactions (next 7 days):")
+    for day in optimal.days[:7]:
+        if day.transactions:
+            print(f"\n   {day.date.strftime('%a %m/%d')}:")
+            for txn, decision in day.transactions:
+                if txn.amount != 0:
+                    amount_str = f"${abs(txn.amount):.2f}"
+                    if txn.amount > 0:
+                        print(f"      ✓ {txn.description}: +{amount_str}")
+                    else:
+                        method_str = ""
+                        if decision.method.value == "checking":
+                            method_str = " [Checking]"
+                        elif decision.method.value == "credit_card":
+                            method_str = f" [Credit]"
+                        elif decision.method.value == "split":
+                            method_str = f" [Split: ${decision.checking_amount:.0f} checking + ${decision.credit_amount:.0f} credit]"
+                        print(f"      • {txn.description}: -{amount_str}{method_str}")
+                        if decision.reason and "⚠️" in decision.reason:
+                            print(f"        {decision.reason}")
+
+    print()
+
+
 def print_upcoming_plan(optimizer: FinancialOptimizer, days: int = 5):
     """Print action plan for the next N days as a table with running account balances."""
     print_header(f"Upcoming {days}-Day Action Plan")
@@ -879,18 +932,18 @@ def run_interactive_mode(config_path: str = "financial_config.json"):
             pause()
 
         elif choice == 2:
-            # View N-Day Action Plan
+            # View N-Day Action Plan (Optimal Simulation)
             try:
                 days_input = input(
-                    "\nHow many days to show? (1-30, default 5): "
+                    "\nHow many days to show? (1-30, default 30): "
                 ).strip()
                 if days_input and days_input.isdigit():
                     days = min(max(int(days_input), 1), 30)
                 else:
-                    days = 5
-                print_upcoming_plan(optimizer, days=days)
+                    days = 30
+                print_optimal_simulation(optimizer, days=days)
             except (ValueError, KeyboardInterrupt):
-                print_upcoming_plan(optimizer, days=5)
+                print_optimal_simulation(optimizer, days=30)
             pause()
 
         elif choice == 3:

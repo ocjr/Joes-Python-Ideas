@@ -15,6 +15,7 @@ from models import (
     Frequency,
 )
 from calendar import monthrange
+from simulator import FinancialSimulator, SimulationResult
 
 
 @dataclass
@@ -65,6 +66,8 @@ class FinancialOptimizer:
     def __init__(self, config: FinancialConfig):
         self.config = config
         self.today = date.today()
+        self.simulator = FinancialSimulator(config, self.today)
+        self._optimal_simulation: Optional[SimulationResult] = None
 
     def get_next_date(
         self, day_of_month: int, from_date: Optional[date] = None
@@ -568,6 +571,31 @@ class FinancialOptimizer:
     def get_cash_flow_forecast(self, days: int = 14) -> Dict[date, DailyBalance]:
         """Get detailed cash flow forecast."""
         return self.build_cash_flow_timeline(days_ahead=days)
+
+    def get_optimal_simulation(
+        self, days_ahead: int = 30, force_refresh: bool = False
+    ) -> SimulationResult:
+        """
+        Get the optimal financial strategy simulation.
+
+        Runs simulations for different strategies and returns the one with
+        the lowest total interest cost while respecting all constraints.
+
+        Parameters
+        ----------
+        days_ahead : int, optional
+            Number of days to simulate (default: 30)
+        force_refresh : bool, optional
+            Force re-computation even if cached result exists (default: False)
+
+        Returns
+        -------
+        SimulationResult
+            The optimal simulation with lowest interest cost
+        """
+        if self._optimal_simulation is None or force_refresh:
+            self._optimal_simulation = self.simulator.find_optimal_strategy(days_ahead)
+        return self._optimal_simulation
 
     def generate_monthly_action_plan(self) -> dict:
         """Generate action-focused monthly financial plan."""
