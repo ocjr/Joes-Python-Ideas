@@ -339,34 +339,77 @@ class FinancialOptimizer:
         payments = {}
         remaining = safe_amount
 
-        # Priority 1: Build emergency fund if below target
+        # Get highest APR among cards with balances
+        priority_cards = self.prioritize_credit_cards()
+        highest_apr = max((cc.apr for cc in priority_cards), default=0.0)
+
+        # Emergency fund status
         emergency_fund = self.calculate_emergency_fund()
-        if emergency_fund < self.config.settings.emergency_fund_target:
-            needed = self.config.settings.emergency_fund_target - emergency_fund
-            emergency_payment = min(remaining * 0.3, needed)  # 30% max to emergency
-            if emergency_payment > 10:  # Only if meaningful amount
-                payments["emergency_fund"] = emergency_payment
-                remaining -= emergency_payment
+        emergency_target = self.config.settings.emergency_fund_target
+        emergency_pct = (
+            (emergency_fund / emergency_target) if emergency_target > 0 else 1.0
+        )
 
-        # Priority 2: Extra credit card payments
-        if remaining > 50:  # Only if we have meaningful amount left
-            priority_cards = self.prioritize_credit_cards()
-            for cc in priority_cards:
-                if remaining <= 10:
-                    break
+        # Decision: Prioritize debt over emergency fund if APR is high
+        # Logic: If we have high-interest debt (>6% APR), pay that first
+        # Only build emergency fund if:
+        #   1. Emergency fund is critically low (<50% of target) AND APR < 10%, OR
+        #   2. All high-interest debts are paid off
+        prioritize_debt = highest_apr > 0.06 and emergency_pct >= 0.5
 
-                # Don't recommend more than the card's current balance
-                max_extra_payment = max(0, cc.balance - cc.minimum_payment)
-                if max_extra_payment <= 0:
-                    continue
+        if prioritize_debt:
+            # Priority 1: Aggressively pay down high-interest debt
+            if remaining > 50:
+                for cc in priority_cards:
+                    if remaining <= 10:
+                        break
 
-                # Calculate how much to pay this card
-                # Pay up to 70% of remaining, but not more than the card balance
-                payment = min(remaining * 0.7, max_extra_payment)
+                    # Don't recommend more than the card's current balance
+                    max_extra_payment = max(0, cc.balance - cc.minimum_payment)
+                    if max_extra_payment <= 0:
+                        continue
 
-                if payment >= 20:  # Only suggest if $20 or more
-                    payments[cc.id] = payment
-                    remaining -= payment
+                    # Pay up to 80% of remaining to highest priority card (more aggressive)
+                    payment = min(remaining * 0.8, max_extra_payment)
+
+                    if payment >= 20:  # Only suggest if $20 or more
+                        payments[cc.id] = payment
+                        remaining -= payment
+
+            # Priority 2: Build emergency fund with remaining (if any)
+            if remaining > 10 and emergency_fund < emergency_target:
+                needed = emergency_target - emergency_fund
+                emergency_payment = min(remaining, needed)
+                if emergency_payment > 10:
+                    payments["emergency_fund"] = emergency_payment
+                    remaining -= emergency_payment
+
+        else:
+            # Priority 1: Build emergency fund if critically low or no high-interest debt
+            if emergency_fund < emergency_target:
+                needed = emergency_target - emergency_fund
+                # If emergency fund is critically low (<50%), allocate more (50%)
+                allocation_pct = 0.5 if emergency_pct < 0.5 else 0.3
+                emergency_payment = min(remaining * allocation_pct, needed)
+                if emergency_payment > 10:
+                    payments["emergency_fund"] = emergency_payment
+                    remaining -= emergency_payment
+
+            # Priority 2: Extra credit card payments
+            if remaining > 50:
+                for cc in priority_cards:
+                    if remaining <= 10:
+                        break
+
+                    max_extra_payment = max(0, cc.balance - cc.minimum_payment)
+                    if max_extra_payment <= 0:
+                        continue
+
+                    payment = min(remaining * 0.7, max_extra_payment)
+
+                    if payment >= 20:
+                        payments[cc.id] = payment
+                        remaining -= payment
 
         return payments
 

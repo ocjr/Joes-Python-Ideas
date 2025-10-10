@@ -212,52 +212,53 @@ def recommend_lump_sum_payment(
     return recommendations
 
 
-def recommend_primary_card(optimizer: FinancialOptimizer) -> dict[str, Any]:
+def recommend_primary_cards(
+    optimizer: FinancialOptimizer, top_n: int = 5
+) -> list[dict[str, Any]]:
     """
-    Recommend which credit card to use as primary for daily purchases.
+    Recommend top N credit cards to use as primary for daily purchases.
 
-    Analyzes credit cards based on available credit, APR, and rewards to
-    determine the best card for maximizing available credit while minimizing
+    Analyzes credit cards based on available credit, APR, and credit limit to
+    determine the best cards for maximizing available credit while minimizing
     interest costs.
 
     Parameters
     ----------
     optimizer : FinancialOptimizer
         Configured optimizer with current financial state
+    top_n : int, optional
+        Number of top recommendations to return (default: 5)
 
     Returns
     -------
-    dict[str, Any]
-        Dictionary with keys:
-        - recommended_card_id (str): ID of the recommended card
-        - card_name (str): Name of the recommended card
-        - reason (str): Explanation for the recommendation
-        - available_credit (float): Available credit on recommended card
+    list[dict[str, Any]]
+        List of card recommendations, each containing:
+        - card_id (str): ID of the card
+        - card_name (str): Name of the card
+        - score (float): Overall score (lower is better)
+        - available_credit (float): Available credit on card
         - utilization (float): Current utilization percentage
+        - apr (float): Annual percentage rate
+        - reason (str): Brief explanation of strengths
 
     Notes
     -----
-    Recommendation criteria (in priority order):
-    1. Cards with lowest utilization (maximize available credit)
-    2. Cards with lowest APR (minimize interest if balance carried)
-    3. Cards with highest credit limit (more flexibility)
+    Recommendation criteria (weighted):
+    1. Utilization (50%) - Lower is better for credit score and flexibility
+    2. APR (30%) - Lower minimizes interest if balance carried
+    3. Credit limit (20%) - Higher provides more flexibility
     """
     cards_with_credit = [
         cc for cc in optimizer.config.credit_cards if cc.available_credit > 0
     ]
 
     if not cards_with_credit:
-        return {
-            "recommended_card_id": None,
-            "card_name": None,
-            "reason": "No cards have available credit",
-            "available_credit": 0,
-            "utilization": 100,
-        }
+        return []
 
     # Score each card (lower is better)
-    # Priority: Low utilization > Low APR > High credit limit
     scored_cards = []
+    max_limit = max(c.credit_limit for c in cards_with_credit)
+
     for cc in cards_with_credit:
         # Utilization score (0-100, lower is better)
         util_score = cc.utilization
@@ -266,41 +267,38 @@ def recommend_primary_card(optimizer: FinancialOptimizer) -> dict[str, Any]:
         apr_score = cc.apr * 100
 
         # Credit limit score (inverted - higher limit is better)
-        # Normalize to 0-100 scale
-        max_limit = max(c.credit_limit for c in cards_with_credit)
         limit_score = 100 * (1 - (cc.credit_limit / max_limit))
 
         # Weighted score: utilization (50%), APR (30%), limit (20%)
         total_score = (util_score * 0.5) + (apr_score * 0.3) + (limit_score * 0.2)
 
-        scored_cards.append((total_score, cc))
+        # Build recommendation reason
+        reasons = []
+        if cc.utilization < 30:
+            reasons.append(f"{cc.utilization:.1f}% util")
+        if cc.apr < 0.15:
+            reasons.append(f"{cc.apr * 100:.1f}% APR")
+        if cc.available_credit > 1000:
+            reasons.append(f"${cc.available_credit:,.0f} avail")
 
-    # Sort by score (lowest first)
-    scored_cards.sort(key=lambda x: x[0])
-    best_card = scored_cards[0][1]
+        reason = ", ".join(reasons) if reasons else "Has available credit"
 
-    # Build recommendation reason
-    reasons = []
-    if best_card.utilization < 30:
-        reasons.append(f"low utilization ({best_card.utilization:.1f}%)")
-    if best_card.apr < 0.15:
-        reasons.append(f"low APR ({best_card.apr * 100:.1f}%)")
-    if best_card.available_credit > 1000:
-        reasons.append(f"high available credit (${best_card.available_credit:,.2f})")
+        scored_cards.append(
+            {
+                "card_id": cc.id,
+                "card_name": cc.name,
+                "score": total_score,
+                "available_credit": cc.available_credit,
+                "utilization": cc.utilization,
+                "apr": cc.apr,
+                "credit_limit": cc.credit_limit,
+                "reason": reason,
+            }
+        )
 
-    reason = (
-        "Best card for purchases: " + ", ".join(reasons)
-        if reasons
-        else "Has available credit"
-    )
-
-    return {
-        "recommended_card_id": best_card.id,
-        "card_name": best_card.name,
-        "reason": reason,
-        "available_credit": best_card.available_credit,
-        "utilization": best_card.utilization,
-    }
+    # Sort by score (lowest first) and return top N
+    scored_cards.sort(key=lambda x: x["score"])
+    return scored_cards[:top_n]
 
 
 def interactive_advice(optimizer: FinancialOptimizer) -> None:
@@ -376,17 +374,84 @@ def interactive_advice(optimizer: FinancialOptimizer) -> None:
         # Primary card recommendation
         print("\n--- Primary Card Recommendation ---\n")
 
-        result = recommend_primary_card(optimizer)
+        top_cards = recommend_primary_cards(optimizer, top_n=5)
 
-        if result["recommended_card_id"]:
-            print(f"✓ Recommended: {result['card_name']}\n")
-            print(f"📊 {result['reason']}")
-            print(f"   Available Credit: ${result['available_credit']:,.2f}")
-            print(f"   Current Utilization: {result['utilization']:.1f}%\n")
-            print("💡 This card will maximize your available credit while")
-            print("   minimizing potential interest charges.\n")
+        if not top_cards:
+            print("❌ No cards have available credit\n")
         else:
-            print(f"❌ {result['reason']}\n")
+            print("Top recommended cards for daily purchases:\n")
+            print(
+                "Rank | Card Name           | Available  | Utilization | APR    | Strengths"
+            )
+            print("-" * 85)
+
+            for i, card in enumerate(top_cards, 1):
+                rank_indicator = "⭐" if i == 1 else f"{i}."
+                card_name = card["card_name"][:19].ljust(19)
+                avail = f"${card['available_credit']:>8,.0f}"
+                util = f"{card['utilization']:>5.1f}%"
+                apr = f"{card['apr'] * 100:>5.1f}%"
+                reason = card["reason"][:30]
+
+                print(
+                    f"{rank_indicator:^4} | {card_name} | {avail} | {util} | {apr} | {reason}"
+                )
+
+            print()
+            print("💡 Criteria: Utilization (50%), APR (30%), Credit Limit (20%)")
+            print()
+
+            # Ask if user wants to set primary card
+            set_primary = get_input(
+                "Set one as your primary card? (y/n)", default="n", input_type=bool
+            )
+
+            if set_primary:
+                while True:
+                    try:
+                        selection = input(
+                            f"\nSelect card (1-{len(top_cards)}, 0 to cancel): "
+                        ).strip()
+                        if not selection.isdigit():
+                            print("⚠️  Please enter a number")
+                            continue
+
+                        selection_num = int(selection)
+                        if selection_num == 0:
+                            break
+                        if 1 <= selection_num <= len(top_cards):
+                            selected_card = top_cards[selection_num - 1]
+
+                            # Update config - mark all as not primary first
+                            for cc in optimizer.config.credit_cards:
+                                cc.primary_for_purchases = False
+
+                            # Mark selected as primary
+                            for cc in optimizer.config.credit_cards:
+                                if cc.id == selected_card["card_id"]:
+                                    cc.primary_for_purchases = True
+                                    break
+
+                            # Save config
+                            from config_loader import save_config
+
+                            # Need to get config path - use default
+                            save_config(optimizer.config, "financial_config.json")
+
+                            print(
+                                f"\n✓ Set {selected_card['card_name']} as primary card for purchases"
+                            )
+                            print(
+                                "   This card will be prioritized in recommendations.\n"
+                            )
+                            break
+
+                        print(
+                            f"⚠️  Please enter a number between 0 and {len(top_cards)}"
+                        )
+                    except (KeyboardInterrupt, EOFError):
+                        print("\n")
+                        break
 
     elif choice == "0":
         print()
