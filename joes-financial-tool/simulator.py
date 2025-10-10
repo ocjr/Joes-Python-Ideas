@@ -203,6 +203,7 @@ class FinancialSimulator:
                 # Skip bills paid by credit - they'll be handled as CC charges
                 if bill.paid_by_credit:
                     # Bill is charged to credit card - create a CC charge transaction
+                    # Note: The simulator will check if the card is over limit and handle accordingly
                     transactions.append(
                         PlannedTransaction(
                             date=next_due,
@@ -348,9 +349,14 @@ class FinancialSimulator:
 
         # If we can't afford from checking, try credit card
         if not can_afford_checking and transaction.can_use_credit:
-            # Find card with available credit
+            # Find card with available credit (not over limit or has room)
             for cc in self.config.credit_cards:
                 current_balance = state.credit_card_balances.get(cc.id, 0)
+
+                # Skip cards that are already over limit
+                if current_balance >= cc.credit_limit:
+                    continue
+
                 available_credit = cc.credit_limit - current_balance
 
                 if available_credit >= expense_amount:
@@ -375,9 +381,14 @@ class FinancialSimulator:
                     reason=f"Pay from checking (${checking_part:.2f})",
                 )
 
-            # Find card with available credit for the remainder
+            # Find card with available credit for the remainder (skip over-limit cards)
             for cc in self.config.credit_cards:
                 current_balance = state.credit_card_balances.get(cc.id, 0)
+
+                # Skip cards already over limit
+                if current_balance >= cc.credit_limit:
+                    continue
+
                 available_credit = cc.credit_limit - current_balance
 
                 if available_credit >= credit_part:
@@ -407,9 +418,18 @@ class FinancialSimulator:
                 total_interest += interest
         return total_interest
 
-    def check_constraints(self, state: FinancialState) -> tuple[bool, list[str]]:
+    def check_constraints(
+        self, state: FinancialState, previous_state: Optional[FinancialState] = None
+    ) -> tuple[bool, list[str]]:
         """
         Check if a financial state violates any constraints.
+
+        Parameters
+        ----------
+        state : FinancialState
+            Current financial state to check
+        previous_state : FinancialState, optional
+            Previous day's state (to check if we made things worse)
 
         Returns
         -------
@@ -418,7 +438,7 @@ class FinancialSimulator:
         """
         violations = []
 
-        # Check account minimum balances
+        # Check account minimum balances - always enforce
         for acc in self.config.accounts:
             balance = state.account_balances.get(acc.id, 0)
             if balance < acc.minimum_balance:
@@ -426,13 +446,27 @@ class FinancialSimulator:
                     f"{state.date}: {acc.name} below minimum (${balance:.2f} < ${acc.minimum_balance:.2f})"
                 )
 
-        # Check credit card limits
+        # Check credit card limits - but allow cards already over limit to stay/decrease
         for cc in self.config.credit_cards:
-            balance = state.credit_card_balances.get(cc.id, 0)
-            if balance > cc.credit_limit:
-                violations.append(
-                    f"{state.date}: {cc.name} over limit (${balance:.2f} > ${cc.credit_limit:.2f})"
-                )
+            current_balance = state.credit_card_balances.get(cc.id, 0)
+
+            if current_balance > cc.credit_limit:
+                # Card is over limit - check if we made it worse
+                if previous_state:
+                    previous_balance = previous_state.credit_card_balances.get(cc.id, 0)
+                    if current_balance > previous_balance:
+                        # We INCREASED the balance while over limit - that's a violation
+                        violations.append(
+                            f"{state.date}: {cc.name} increased while over limit "
+                            f"(${previous_balance:.2f} → ${current_balance:.2f}, limit ${cc.credit_limit:.2f})"
+                        )
+                else:
+                    # No previous state (first day) - only fail if we're significantly over
+                    # Allow some wiggle room for initial state (interest, fees, etc)
+                    if current_balance > cc.credit_limit * 1.01:  # 1% tolerance
+                        violations.append(
+                            f"{state.date}: {cc.name} over limit (${current_balance:.2f} > ${cc.credit_limit:.2f})"
+                        )
 
         return (len(violations) == 0, violations)
 
@@ -621,15 +655,41 @@ class FinancialSimulator:
 
                 # Special case: Bills on credit just add to CC balance
                 if txn.category == "bill_on_credit":
-                    # Add to credit card balance
+                    # Check if the card is already at/over limit - if so, pay from checking instead
                     if (
                         txn.preferred_account
                         and txn.preferred_account in working_state.credit_card_balances
                     ):
-                        working_state.credit_card_balances[
+                        current_cc_balance = working_state.credit_card_balances[
                             txn.preferred_account
-                        ] += abs(txn.amount)
-                    # No checking deduction needed
+                        ]
+                        cc = next(
+                            (
+                                c
+                                for c in self.config.credit_cards
+                                if c.id == txn.preferred_account
+                            ),
+                            None,
+                        )
+
+                        if cc and current_cc_balance >= cc.credit_limit:
+                            # Card is at or over limit - pay from checking instead to avoid making it worse
+                            checking_accounts = [
+                                acc
+                                for acc in self.config.accounts
+                                if acc.type.value == "checking"
+                            ]
+                            if checking_accounts:
+                                acc_id = checking_accounts[0].id
+                                working_state.account_balances[acc_id] -= abs(
+                                    txn.amount
+                                )
+                        else:
+                            # Card has room - charge to it normally
+                            working_state.credit_card_balances[
+                                txn.preferred_account
+                            ] += abs(txn.amount)
+                    # No more processing needed for bill_on_credit
                 elif decision.method == PaymentMethod.CHECKING:
                     # Pay from checking account (subtract expense_amount)
                     checking_accounts = [
@@ -745,6 +805,7 @@ class FinancialSimulator:
         day_results = []
         warnings = []
         failed = False
+        previous_day_state = None
 
         for day_offset in range(days_ahead + 1):
             current_date = self.today + timedelta(days=day_offset)
@@ -759,16 +820,21 @@ class FinancialSimulator:
             day_sim = self.simulate_day(current_state, day_txns, future_txns, strategy)
             day_results.append(day_sim)
 
-            # Check for constraint violations
-            is_valid, violations = self.check_constraints(day_sim.ending_state)
-            if not is_valid:
-                # HARD FAIL - this simulation is invalid
-                warnings.extend(violations)
-                failed = True
-                # Stop the simulation - no point continuing with invalid state
-                break
+            # Check for constraint violations, comparing to previous day
+            # Skip checking on the very first day - we accept the starting state as-is
+            if day_offset > 0:
+                is_valid, violations = self.check_constraints(
+                    day_sim.ending_state, previous_day_state
+                )
+                if not is_valid:
+                    # HARD FAIL - this simulation is invalid
+                    warnings.extend(violations)
+                    failed = True
+                    # Stop the simulation - no point continuing with invalid state
+                    break
 
             # Update state for next day
+            previous_day_state = day_sim.ending_state  # Track previous state
             current_state = day_sim.ending_state
             current_state.date = current_date + timedelta(days=1)
 
