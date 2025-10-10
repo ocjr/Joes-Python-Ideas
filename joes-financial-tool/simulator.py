@@ -79,6 +79,7 @@ class PaymentDecision:
 
     method: PaymentMethod
     checking_amount: float = 0.0
+    checking_account_id: Optional[str] = None  # Which checking account to use
     credit_card_id: Optional[str] = None
     credit_amount: float = 0.0
     reason: str = ""
@@ -264,6 +265,41 @@ class FinancialSimulator:
 
         return sorted(transactions, key=lambda x: x.date)
 
+    def select_best_checking_account(
+        self,
+        checking_accounts: list[Account],
+        state: FinancialState,
+        amount_needed: float,
+    ) -> Optional[str]:
+        """
+        Select the best checking account to pay from.
+
+        Chooses the account with the most available funds (above minimum balance)
+        that can afford the payment. Returns None if no account can afford it.
+        """
+        # Calculate available balance for each account
+        account_choices = []
+        for acc in checking_accounts:
+            current_balance = state.account_balances.get(acc.id, 0)
+            available = current_balance - acc.minimum_balance
+
+            if available >= amount_needed:
+                # This account can afford the payment
+                account_choices.append((acc.id, available))
+
+        if not account_choices:
+            # No single account can afford it - try the one with most available
+            # (this will likely cause a violation, but we'll detect it later)
+            account_choices = [
+                (acc.id, state.account_balances.get(acc.id, 0) - acc.minimum_balance)
+                for acc in checking_accounts
+            ]
+
+        # Sort by available balance (most available first)
+        account_choices.sort(key=lambda x: x[1], reverse=True)
+
+        return account_choices[0][0] if account_choices else None
+
     def decide_payment_method(
         self,
         transaction: PlannedTransaction,
@@ -275,7 +311,7 @@ class FinancialSimulator:
         Decide how to pay for a transaction (checking, credit, or split).
 
         Considers:
-        - Available checking balance and minimum requirements
+        - Available checking balance and minimum requirements (tries all checking accounts)
         - Available credit on cards
         - Future transactions to ensure we don't run out of money
         - Optimization strategy (minimize interest)
@@ -303,6 +339,8 @@ class FinancialSimulator:
         checking_accounts = [
             acc for acc in self.config.accounts if acc.type.value == "checking"
         ]
+
+        # Calculate total available across ALL checking accounts
         total_checking = sum(
             state.account_balances.get(acc.id, 0) for acc in checking_accounts
         )
@@ -327,9 +365,14 @@ class FinancialSimulator:
 
         if can_afford_checking and not transaction.can_use_credit:
             # Must use checking (e.g., CC payments)
+            # Select the best checking account
+            best_account = self.select_best_checking_account(
+                checking_accounts, state, expense_amount
+            )
             return PaymentDecision(
                 method=PaymentMethod.CHECKING,
                 checking_amount=expense_amount,
+                checking_account_id=best_account,
                 reason="Required checking payment",
             )
 
@@ -341,9 +384,13 @@ class FinancialSimulator:
         ):
             # In aggressive debt mode, avoid using credit cards - pay cash when possible
             if can_afford_checking:
+                best_account = self.select_best_checking_account(
+                    checking_accounts, state, expense_amount
+                )
                 return PaymentDecision(
                     method=PaymentMethod.CHECKING,
                     checking_amount=expense_amount,
+                    checking_account_id=best_account,
                     reason="Avoid credit to minimize debt",
                 )
 
@@ -375,9 +422,13 @@ class FinancialSimulator:
 
             # If no credit part needed, just pay from checking
             if credit_part == 0:
+                best_account = self.select_best_checking_account(
+                    checking_accounts, state, checking_part
+                )
                 return PaymentDecision(
                     method=PaymentMethod.CHECKING,
                     checking_amount=checking_part,
+                    checking_account_id=best_account,
                     reason=f"Pay from checking (${checking_part:.2f})",
                 )
 
@@ -392,18 +443,26 @@ class FinancialSimulator:
                 available_credit = cc.credit_limit - current_balance
 
                 if available_credit >= credit_part:
+                    best_account = self.select_best_checking_account(
+                        checking_accounts, state, checking_part
+                    )
                     return PaymentDecision(
                         method=PaymentMethod.SPLIT,
                         checking_amount=checking_part,
+                        checking_account_id=best_account,
                         credit_card_id=cc.id,
                         credit_amount=credit_part,
                         reason=f"Split payment: ${checking_part:.2f} checking + ${credit_part:.2f} credit",
                     )
 
         # Default: use checking even if it violates constraints (will generate warning)
+        best_account = self.select_best_checking_account(
+            checking_accounts, state, expense_amount
+        )
         return PaymentDecision(
             method=PaymentMethod.CHECKING,
             checking_amount=expense_amount,
+            checking_account_id=best_account,
             reason="⚠️ WARNING: May violate minimum balance",
         )
 
@@ -476,6 +535,7 @@ class FinancialSimulator:
         current_date: date,
         future_transactions: list[PlannedTransaction],
         strategy: OptimizationStrategy,
+        reduction_factor: float = 1.0,  # Multiply safe_amount by this (0.0 to 1.0)
     ) -> list[PlannedTransaction]:
         """
         Calculate extra CC payments that can be safely made without compromising future obligations.
@@ -541,6 +601,9 @@ class FinancialSimulator:
         # This ensures we maintain minimum balances plus extra cushion
         safe_amount = max(0, available_checking + net_future_cash - safety_buffer)
 
+        # Apply reduction factor (used when retrying after failures)
+        safe_amount = safe_amount * reduction_factor
+
         # Don't make extra payments if we don't have significant cushion
         if safe_amount < 100:
             return []
@@ -604,6 +667,7 @@ class FinancialSimulator:
         day_transactions: list[PlannedTransaction],
         all_future_transactions: list[PlannedTransaction],
         strategy: OptimizationStrategy,
+        reduction_factor: float = 1.0,
     ) -> DaySimulation:
         """Simulate a single day with all its transactions."""
         starting_state = deepcopy(current_state)
@@ -637,6 +701,7 @@ class FinancialSimulator:
                 ):
                     working_state.account_balances[txn.preferred_account] += txn.amount
                 else:
+                    # Deposit to first checking account
                     checking_accounts = [
                         acc
                         for acc in self.config.accounts
@@ -674,14 +739,17 @@ class FinancialSimulator:
 
                         if cc and current_cc_balance >= cc.credit_limit:
                             # Card is at or over limit - pay from checking instead to avoid making it worse
+                            # Use best checking account
                             checking_accounts = [
                                 acc
                                 for acc in self.config.accounts
                                 if acc.type.value == "checking"
                             ]
-                            if checking_accounts:
-                                acc_id = checking_accounts[0].id
-                                working_state.account_balances[acc_id] -= abs(
+                            best_account = self.select_best_checking_account(
+                                checking_accounts, working_state, abs(txn.amount)
+                            )
+                            if best_account:
+                                working_state.account_balances[best_account] -= abs(
                                     txn.amount
                                 )
                         else:
@@ -691,14 +759,19 @@ class FinancialSimulator:
                             ] += abs(txn.amount)
                     # No more processing needed for bill_on_credit
                 elif decision.method == PaymentMethod.CHECKING:
-                    # Pay from checking account (subtract expense_amount)
-                    checking_accounts = [
-                        acc
-                        for acc in self.config.accounts
-                        if acc.type.value == "checking"
-                    ]
-                    if checking_accounts:
-                        acc_id = checking_accounts[0].id
+                    # Pay from checking account using the selected account
+                    acc_id = decision.checking_account_id
+                    if not acc_id:
+                        # Fallback to first checking account if not specified
+                        checking_accounts = [
+                            acc
+                            for acc in self.config.accounts
+                            if acc.type.value == "checking"
+                        ]
+                        if checking_accounts:
+                            acc_id = checking_accounts[0].id
+
+                    if acc_id:
                         working_state.account_balances[
                             acc_id
                         ] -= decision.checking_amount
@@ -725,16 +798,22 @@ class FinancialSimulator:
 
                 elif decision.method == PaymentMethod.SPLIT:
                     # Split between checking and credit
-                    checking_accounts = [
-                        acc
-                        for acc in self.config.accounts
-                        if acc.type.value == "checking"
-                    ]
-                    if checking_accounts:
-                        acc_id = checking_accounts[0].id
+                    acc_id = decision.checking_account_id
+                    if not acc_id:
+                        # Fallback to first checking account
+                        checking_accounts = [
+                            acc
+                            for acc in self.config.accounts
+                            if acc.type.value == "checking"
+                        ]
+                        if checking_accounts:
+                            acc_id = checking_accounts[0].id
+
+                    if acc_id:
                         working_state.account_balances[
                             acc_id
                         ] -= decision.checking_amount
+
                     if decision.credit_card_id:
                         working_state.credit_card_balances[
                             decision.credit_card_id
@@ -748,7 +827,11 @@ class FinancialSimulator:
 
         if has_cc_payment:
             extra_payments = self.calculate_extra_cc_payments(
-                working_state, current_state.date, all_future_transactions, strategy
+                working_state,
+                current_state.date,
+                all_future_transactions,
+                strategy,
+                reduction_factor,
             )
 
             # Process extra payments
@@ -759,13 +842,19 @@ class FinancialSimulator:
 
                 # Apply extra payment
                 if decision.method == PaymentMethod.CHECKING:
-                    checking_accounts = [
-                        acc
-                        for acc in self.config.accounts
-                        if acc.type.value == "checking"
-                    ]
-                    if checking_accounts:
-                        acc_id = checking_accounts[0].id
+                    # Use the selected checking account
+                    acc_id = decision.checking_account_id
+                    if not acc_id:
+                        # Fallback to first checking account
+                        checking_accounts = [
+                            acc
+                            for acc in self.config.accounts
+                            if acc.type.value == "checking"
+                        ]
+                        if checking_accounts:
+                            acc_id = checking_accounts[0].id
+
+                    if acc_id:
                         working_state.account_balances[
                             acc_id
                         ] -= decision.checking_amount
@@ -796,7 +885,10 @@ class FinancialSimulator:
         )
 
     def run_simulation(
-        self, strategy: OptimizationStrategy, days_ahead: int = 30
+        self,
+        strategy: OptimizationStrategy,
+        days_ahead: int = 30,
+        reduction_factor: float = 1.0,
     ) -> SimulationResult:
         """Run a complete simulation with the given strategy."""
         current_state = self.create_initial_state()
@@ -817,7 +909,9 @@ class FinancialSimulator:
             future_txns = [t for t in all_transactions if t.date > current_date]
 
             # Simulate the day
-            day_sim = self.simulate_day(current_state, day_txns, future_txns, strategy)
+            day_sim = self.simulate_day(
+                current_state, day_txns, future_txns, strategy, reduction_factor
+            )
             day_results.append(day_sim)
 
             # Check for constraint violations, comparing to previous day
@@ -847,6 +941,69 @@ class FinancialSimulator:
             failed=failed,
         )
 
+    def run_simulation_with_retry(
+        self, strategy: OptimizationStrategy, days_ahead: int = 30
+    ) -> SimulationResult:
+        """
+        Run simulation with automatic retry on failure.
+
+        If simulation fails due to constraint violations, automatically retries with
+        progressively reduced extra payments until finding a valid solution or
+        determining that even minimum payments can't be made.
+
+        Returns
+        -------
+        SimulationResult
+            The best valid simulation found, or the minimum-payment simulation if all fail
+        """
+        # Try with different reduction factors
+        reduction_factors = [
+            1.0,
+            0.75,
+            0.5,
+            0.25,
+            0.0,
+        ]  # 100%, 75%, 50%, 25%, 0% extra payments
+
+        for reduction_factor in reduction_factors:
+            result = self.run_simulation(strategy, days_ahead, reduction_factor)
+
+            if not result.failed:
+                # Success! This reduction factor works
+                if reduction_factor < 1.0:
+                    result.warnings.insert(
+                        0,
+                        f"Note: Reduced extra payments to {reduction_factor*100:.0f}% to avoid violations",
+                    )
+                return result
+
+        # All attempts failed, even with zero extra payments
+        # Return the last result (minimum payments only) with shortfall calculation
+        final_result = result  # This is the 0.0 reduction factor result
+
+        # Calculate how much more cash would be needed
+        if final_result.warnings:
+            # Parse the violation to find the shortfall
+            first_violation = final_result.warnings[0]
+            # Try to extract the negative balance from the warning message
+            # Format: "Date: Account below minimum ($X.XX < $Y.YY)"
+            import re
+
+            match = re.search(r"\$(-?\d+\.?\d*)", first_violation)
+            if match:
+                current_balance = float(match.group(1))
+                # Find minimum required
+                match2 = re.search(r"< \$(\d+\.?\d*)", first_violation)
+                if match2:
+                    min_required = float(match2.group(1))
+                    shortfall = min_required - current_balance
+                    final_result.warnings.insert(
+                        0,
+                        f"⚠️ INSUFFICIENT FUNDS: Need approximately ${shortfall:.2f} more to complete all required payments",
+                    )
+
+        return final_result
+
     def find_optimal_strategy(self, days_ahead: int = 30) -> SimulationResult:
         """Run simulations for all strategies and return the one with lowest interest cost.
 
@@ -856,7 +1013,7 @@ class FinancialSimulator:
         results = []
 
         for strategy in OptimizationStrategy:
-            result = self.run_simulation(strategy, days_ahead)
+            result = self.run_simulation_with_retry(strategy, days_ahead)
             results.append(result)
 
         # Filter out failed simulations
