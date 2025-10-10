@@ -199,17 +199,33 @@ class FinancialSimulator:
             next_due = temp_optimizer.get_next_date(bill.due_day)
 
             while next_due <= end_date:
-                transactions.append(
-                    PlannedTransaction(
-                        date=next_due,
-                        description=f"Bill: {bill.name}",
-                        amount=-bill.amount,
-                        category="bill",
-                        required=True,
-                        preferred_account=bill.payment_account,
-                        can_use_credit=True,  # Bills can typically be paid by credit card
+                # Skip bills paid by credit - they'll be handled as CC charges
+                if bill.paid_by_credit:
+                    # Bill is charged to credit card - create a CC charge transaction
+                    transactions.append(
+                        PlannedTransaction(
+                            date=next_due,
+                            description=f"Bill: {bill.name} (charged to CC)",
+                            amount=-bill.amount,
+                            category="bill_on_credit",
+                            required=True,
+                            preferred_account=bill.payment_account,  # This is the CC ID
+                            can_use_credit=False,  # Already on credit
+                        )
                     )
-                )
+                else:
+                    # Bill paid from checking/savings
+                    transactions.append(
+                        PlannedTransaction(
+                            date=next_due,
+                            description=f"Bill: {bill.name}",
+                            amount=-bill.amount,
+                            category="bill",
+                            required=True,
+                            preferred_account=bill.payment_account,
+                            can_use_credit=True,  # Can optionally use credit if cash is low
+                        )
+                    )
 
                 # Calculate next occurrence
                 if bill.frequency.value == "monthly":
@@ -268,6 +284,15 @@ class FinancialSimulator:
                 method=PaymentMethod.CHECKING,
                 checking_amount=0,
                 reason="Income deposit",
+            )
+
+        # Bill on credit - already charged to CC, no payment decision needed
+        if transaction.category == "bill_on_credit":
+            return PaymentDecision(
+                method=PaymentMethod.CREDIT_CARD,
+                credit_card_id=transaction.preferred_account,
+                credit_amount=abs(transaction.amount),
+                reason="Bill charged to credit card",
             )
 
         expense_amount = abs(transaction.amount)
@@ -377,6 +402,121 @@ class FinancialSimulator:
                 total_interest += interest
         return total_interest
 
+    def calculate_extra_cc_payments(
+        self,
+        current_state: FinancialState,
+        current_date: date,
+        future_transactions: list[PlannedTransaction],
+        strategy: OptimizationStrategy,
+    ) -> list[PlannedTransaction]:
+        """
+        Calculate extra CC payments that can be safely made without compromising future obligations.
+
+        Looks ahead at all required future transactions and ensures we maintain adequate cash reserves.
+
+        Parameters
+        ----------
+        current_state : FinancialState
+            Current financial state after all regular transactions for the day
+        current_date : date
+            Current date in the simulation
+        future_transactions : list[PlannedTransaction]
+            All upcoming transactions to consider
+        strategy : OptimizationStrategy
+            Strategy to use for prioritizing payments
+
+        Returns
+        -------
+        list[PlannedTransaction]
+            Extra payment transactions to add for today
+        """
+        extra_payments = []
+
+        # Get current checking balance
+        checking_accounts = [
+            acc for acc in self.config.accounts if acc.type.value == "checking"
+        ]
+        total_checking = sum(
+            current_state.account_balances.get(acc.id, 0) for acc in checking_accounts
+        )
+        min_balance_required = sum(acc.minimum_balance for acc in checking_accounts)
+        available_checking = total_checking - min_balance_required
+
+        # Calculate total required payments coming up (look 30 days ahead)
+        future_required_amount = 0.0
+        future_income_amount = 0.0
+        cutoff_date = current_date + timedelta(days=30)
+
+        for txn in future_transactions:
+            if txn.date > cutoff_date:
+                break
+            if txn.required and txn.amount < 0:
+                future_required_amount += abs(txn.amount)
+            elif txn.amount > 0:
+                future_income_amount += txn.amount
+
+        # Calculate safe amount = current available + future income - future required - buffer
+        safety_buffer = 500  # Always keep $500 buffer
+        net_future_cash = future_income_amount - future_required_amount
+        safe_amount = max(0, available_checking + net_future_cash - safety_buffer)
+
+        # Don't make extra payments if we don't have significant cushion
+        if safe_amount < 100:
+            return []
+
+        # Prioritize cards based on strategy
+        cards_with_balance = [
+            cc
+            for cc in self.config.credit_cards
+            if current_state.credit_card_balances.get(cc.id, 0) > 0
+        ]
+
+        if strategy == OptimizationStrategy.AGGRESSIVE_DEBT:
+            # Highest APR first
+            cards_with_balance.sort(key=lambda x: x.apr, reverse=True)
+            allocation_pct = 0.8  # Use 80% of safe amount for debt
+        elif strategy == OptimizationStrategy.BALANCED:
+            # Balance between APR and balance
+            cards_with_balance.sort(
+                key=lambda x: (x.apr * 0.6 + (x.balance / 10000) * 0.4), reverse=True
+            )
+            allocation_pct = 0.5  # Use 50% of safe amount for debt
+        else:  # EMERGENCY_FIRST
+            # Only pay debt with leftover
+            cards_with_balance.sort(key=lambda x: x.balance)
+            allocation_pct = 0.2  # Use 20% of safe amount for debt
+
+        remaining = safe_amount * allocation_pct
+
+        # Allocate to cards
+        for cc in cards_with_balance:
+            if remaining <= 20:  # Don't bother with tiny payments
+                break
+
+            current_balance = current_state.credit_card_balances.get(cc.id, 0)
+            if current_balance <= 0:
+                continue
+
+            # Calculate payment amount - don't pay more than the balance
+            payment_amount = min(remaining, current_balance)
+
+            if payment_amount >= 20:  # Minimum $20 extra payment
+                # Create extra payment transaction
+                extra_payments.append(
+                    PlannedTransaction(
+                        date=current_date,
+                        description=f"CC Extra Payment: {cc.name} ({cc.id})",
+                        amount=-payment_amount,
+                        category="cc_extra_payment",
+                        required=False,
+                        preferred_account=cc.payment_account,
+                        can_use_credit=False,
+                    )
+                )
+                remaining -= payment_amount
+
+        return extra_payments
+
     def simulate_day(
         self,
         current_state: FinancialState,
@@ -390,6 +530,18 @@ class FinancialSimulator:
         processed = []
 
         for txn in day_transactions:
+            # Skip CC payments if card has $0 balance (already paid off)
+            if (
+                txn.category == "cc_payment"
+                and "(" in txn.description
+                and ")" in txn.description
+            ):
+                cc_id = txn.description.split("(")[1].split(")")[0]
+                if cc_id in working_state.credit_card_balances:
+                    if working_state.credit_card_balances[cc_id] <= 0:
+                        # Card already paid off, skip this payment
+                        continue
+
             # Decide how to pay
             decision = self.decide_payment_method(
                 txn, working_state, all_future_transactions, strategy
@@ -416,9 +568,22 @@ class FinancialSimulator:
             else:
                 # Expense - apply according to decision
                 # Special case: CC payments reduce debt instead of increasing it
-                is_cc_payment = txn.category == "cc_payment"
+                is_cc_payment = (
+                    txn.category == "cc_payment" or txn.category == "cc_extra_payment"
+                )
 
-                if decision.method == PaymentMethod.CHECKING:
+                # Special case: Bills on credit just add to CC balance
+                if txn.category == "bill_on_credit":
+                    # Add to credit card balance
+                    if (
+                        txn.preferred_account
+                        and txn.preferred_account in working_state.credit_card_balances
+                    ):
+                        working_state.credit_card_balances[
+                            txn.preferred_account
+                        ] += abs(txn.amount)
+                    # No checking deduction needed
+                elif decision.method == PaymentMethod.CHECKING:
                     # Pay from checking account (subtract expense_amount)
                     checking_accounts = [
                         acc
@@ -469,6 +634,44 @@ class FinancialSimulator:
                         ] += decision.credit_amount
 
             processed.append((txn, decision))
+
+        # After processing all regular transactions, check if we should make extra CC payments
+        # Only do this on days when we made a CC minimum payment (CC due dates)
+        has_cc_payment = any(txn.category == "cc_payment" for txn in day_transactions)
+
+        if has_cc_payment:
+            extra_payments = self.calculate_extra_cc_payments(
+                working_state, current_state.date, all_future_transactions, strategy
+            )
+
+            # Process extra payments
+            for extra_txn in extra_payments:
+                decision = self.decide_payment_method(
+                    extra_txn, working_state, all_future_transactions, strategy
+                )
+
+                # Apply extra payment
+                if decision.method == PaymentMethod.CHECKING:
+                    checking_accounts = [
+                        acc
+                        for acc in self.config.accounts
+                        if acc.type.value == "checking"
+                    ]
+                    if checking_accounts:
+                        acc_id = checking_accounts[0].id
+                        working_state.account_balances[
+                            acc_id
+                        ] -= decision.checking_amount
+
+                    # Reduce CC balance
+                    if "(" in extra_txn.description and ")" in extra_txn.description:
+                        cc_id = extra_txn.description.split("(")[1].split(")")[0]
+                        if cc_id in working_state.credit_card_balances:
+                            working_state.credit_card_balances[
+                                cc_id
+                            ] -= decision.checking_amount
+
+                processed.append((extra_txn, decision))
 
         # Calculate interest for the day
         interest = self.calculate_daily_interest(working_state)

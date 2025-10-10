@@ -31,17 +31,37 @@ print(f"   Total Savings:  ${optimal.final_state.get_total_savings():.2f}")
 print(f"   Total Debt:     ${optimal.final_state.get_total_debt():.2f}")
 
 # Show first few days of transactions
-print(f"\n📋 Sample Transactions (first 3 days with activity):")
-days_shown = 0
-for day in optimal.days:
-    if day.transactions and days_shown < 3:
+print(f"\n📋 Detailed Transactions (first 7 days):")
+for i, day in enumerate(optimal.days[:7]):
+    if day.transactions:
         print(f"\n{day.date.strftime('%a %m/%d')}:")
+        print(
+            f"  Starting: Checking=${day.starting_state.get_total_checking():.2f}, Debt=${day.starting_state.get_total_debt():.2f}"
+        )
+
         for txn, decision in day.transactions:
             if abs(txn.amount) > 0:
                 amount_str = f"${abs(txn.amount):.2f}"
                 if txn.amount > 0:
-                    print(f"  + {txn.description}: {amount_str}")
+                    print(f"    ✓ {txn.description}: +{amount_str}")
+                    if txn.preferred_account:
+                        print(f"      → Deposited to: {txn.preferred_account}")
                 else:
-                    print(f"  - {txn.description}: {amount_str}")
-                    print(f"    Method: {decision.method.value}, Reason: {decision.reason}")
-        days_shown += 1
+                    print(f"    • {txn.description}: -{amount_str}")
+                    if decision.method.value == "checking":
+                        print(f"      → Paid from checking")
+                    elif decision.method.value == "credit_card":
+                        print(f"      → Charged to credit card")
+                    elif decision.method.value == "split":
+                        print(
+                            f"      → Split: ${decision.checking_amount:.2f} checking + ${decision.credit_amount:.2f} credit"
+                        )
+
+                    # Show if this is a CC payment (reduces debt)
+                    if "cc_payment" in txn.category or "cc_extra" in txn.category:
+                        print(f"      → Reduces credit card debt")
+
+        print(
+            f"  Ending: Checking=${day.ending_state.get_total_checking():.2f}, Debt=${day.ending_state.get_total_debt():.2f}"
+        )
+        print(f"  Interest accrued today: ${day.interest_accrued:.2f}")
