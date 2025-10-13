@@ -318,7 +318,21 @@ def print_optimal_simulation(optimizer: FinancialOptimizer, days: int = 30):
                                 if cc:
                                     card_name = cc.name
                             method_str = f" [Split: ${decision.checking_amount:.0f} from {checking_name} + ${decision.credit_amount:.0f} using {card_name}]"
-                        print(f"      • {txn.description}: -{amount_str}{method_str}")
+                        # Check if this is an extra payment with detailed reasoning
+                        if (
+                            "cc_extra_payment" in txn.category
+                            and " - " in txn.description
+                        ):
+                            # Split description to show reasoning on separate line
+                            main_desc, *reason_parts = txn.description.split(" - ")
+                            reasoning = " - ".join(reason_parts)
+                            print(f"      • {main_desc}: -{amount_str}{method_str}")
+                            print(f"          └─ Why: {reasoning}")
+                        else:
+                            print(
+                                f"      • {txn.description}: -{amount_str}{method_str}"
+                            )
+
                         if decision.reason and "⚠️" in decision.reason:
                             print(f"        {decision.reason}")
 

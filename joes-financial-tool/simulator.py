@@ -698,24 +698,29 @@ class FinancialSimulator:
         ]
 
         if strategy == OptimizationStrategy.AGGRESSIVE_DEBT:
-            # Highest APR first
+            # Highest APR first (avalanche method)
             cards_with_balance.sort(key=lambda x: x.apr, reverse=True)
             allocation_pct = 0.8  # Use 80% of safe amount for debt
+            strategy_desc = "Avalanche (highest APR first)"
         elif strategy == OptimizationStrategy.BALANCED:
             # Balance between APR and balance
             cards_with_balance.sort(
                 key=lambda x: (x.apr * 0.6 + (x.balance / 10000) * 0.4), reverse=True
             )
             allocation_pct = 0.5  # Use 50% of safe amount for debt
+            strategy_desc = "Balanced (APR + balance)"
         else:  # EMERGENCY_FIRST
-            # Only pay debt with leftover
+            # Only pay debt with leftover (snowball method)
             cards_with_balance.sort(key=lambda x: x.balance)
             allocation_pct = 0.2  # Use 20% of safe amount for debt
+            strategy_desc = "Snowball (smallest balance first)"
 
         remaining = safe_amount * allocation_pct
 
-        # Allocate to cards
+        # Allocate to cards with detailed reasoning
+        card_rank = 0
         for cc in cards_with_balance:
+            card_rank += 1
             if remaining <= 20:  # Don't bother with tiny payments
                 break
 
@@ -727,11 +732,41 @@ class FinancialSimulator:
             payment_amount = min(remaining, current_balance)
 
             if payment_amount >= 20:  # Minimum $20 extra payment
-                # Create extra payment transaction
+                # Calculate daily interest savings
+                daily_interest_saved = (payment_amount * cc.apr) / 365
+                monthly_interest_saved = daily_interest_saved * 30
+
+                # Build detailed description with reasoning
+                reason_parts = []
+
+                # Why this card?
+                if strategy == OptimizationStrategy.AGGRESSIVE_DEBT:
+                    reason_parts.append(f"Highest APR: {cc.apr*100:.2f}%")
+                elif strategy == OptimizationStrategy.BALANCED:
+                    reason_parts.append(
+                        f"APR {cc.apr*100:.2f}%, Bal ${current_balance:,.0f}"
+                    )
+                else:  # EMERGENCY_FIRST
+                    reason_parts.append(f"Lowest balance")
+
+                # Why this amount?
+                if payment_amount >= current_balance:
+                    reason_parts.append("pays off card")
+                else:
+                    reason_parts.append(
+                        f"${safe_amount * allocation_pct:,.0f} available for debt"
+                    )
+
+                # What's the benefit?
+                reason_parts.append(f"saves ${monthly_interest_saved:.2f}/mo")
+
+                reason_str = " - ".join(reason_parts)
+
+                # Create extra payment transaction with detailed description
                 extra_payments.append(
                     PlannedTransaction(
                         date=current_date,
-                        description=f"CC Extra Payment: {cc.name} ({cc.id})",
+                        description=f"CC Extra Payment: {cc.name} ({cc.id}) - {reason_str}",
                         amount=-payment_amount,
                         category="cc_extra_payment",
                         required=False,
