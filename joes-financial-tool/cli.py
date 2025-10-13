@@ -16,6 +16,8 @@ from setup_wizard import (
     add_income_to_config,
     add_bill_to_config,
     add_credit_card_to_config,
+    add_manual_payment_to_config,
+    add_recurring_expense_to_config,
 )
 from edit_wizard import edit_account, edit_income, edit_bill, edit_credit_card
 from bill_tracker import mark_bill_paid
@@ -64,14 +66,16 @@ def print_menu(current_config: str = "financial_config.json"):
     print("   11. ➕ Add New Income Source")
     print("   12. ➕ Add New Bill")
     print("   13. ➕ Add New Credit Card")
-    print("   14. ✏️  Edit Account")
-    print("   15. ✏️  Edit Income Source")
-    print("   16. ✏️  Edit Bill")
-    print("   17. ✏️  Edit Credit Card")
+    print("   14. ➕ Add Manual Payment")
+    print("   15. ➕ Add Recurring Expense")
+    print("   16. ✏️  Edit Account")
+    print("   17. ✏️  Edit Income Source")
+    print("   18. ✏️  Edit Bill")
+    print("   19. ✏️  Edit Credit Card")
     print()
     print("  SETUP:")
-    print("   18. ⚙️  Run Full Setup Wizard (creates new dated config)")
-    print("   19. 📂 Load Previous Config")
+    print("   20. ⚙️  Run Full Setup Wizard (creates new dated config)")
+    print("   21. 📂 Load Previous Config")
     print()
     print("    0. 🚪 Exit")
     print()
@@ -81,10 +85,10 @@ def get_menu_choice():
     """Get user's menu choice."""
     while True:
         try:
-            choice = input("Select option (0-19): ").strip()
-            if choice.isdigit() and 0 <= int(choice) <= 19:
+            choice = input("Select option (0-21): ").strip()
+            if choice.isdigit() and 0 <= int(choice) <= 21:
                 return int(choice)
-            print("⚠️  Please enter a number between 0 and 19")
+            print("⚠️  Please enter a number between 0 and 21")
         except KeyboardInterrupt:
             print("\n")
             return 0
@@ -622,7 +626,7 @@ def run_interactive_mode(config_path: str = "financial_config.json"):
             print("\n👋 Thanks for using Financial Optimization Tool!\n")
             break
 
-        elif choice == 18:
+        elif choice == 20:
             # Run full setup wizard - creates new dated config
             clear_screen()
             dated_config = get_dated_config_name()
@@ -633,7 +637,7 @@ def run_interactive_mode(config_path: str = "financial_config.json"):
                 pause()
             continue
 
-        elif choice == 19:
+        elif choice == 21:
             # Load previous config
             clear_screen()
             print_header("Load Previous Configuration")
@@ -644,8 +648,8 @@ def run_interactive_mode(config_path: str = "financial_config.json"):
             pause()
             continue
 
-        # For options 8 and 10-13, we can add/mark bills without loading full config
-        if choice in [8, 10, 11, 12, 13]:
+        # For options 8 and 10-15, we can add/mark without loading full config
+        if choice in [8, 10, 11, 12, 13, 14, 15]:
             clear_screen()
             if choice == 8:
                 mark_bill_paid(current_config)
@@ -657,19 +661,23 @@ def run_interactive_mode(config_path: str = "financial_config.json"):
                 add_bill_to_config(current_config)
             elif choice == 13:
                 add_credit_card_to_config(current_config)
+            elif choice == 14:
+                add_manual_payment_to_config(current_config)
+            elif choice == 15:
+                add_recurring_expense_to_config(current_config)
             pause()
             continue
 
-        # For options 14-17, edit existing items (need valid config)
-        if choice in [14, 15, 16, 17]:
+        # For options 16-19, edit existing items (need valid config)
+        if choice in [16, 17, 18, 19]:
             clear_screen()
-            if choice == 14:
+            if choice == 16:
                 edit_account(current_config)
-            elif choice == 15:
-                edit_income(current_config)
-            elif choice == 16:
-                edit_bill(current_config)
             elif choice == 17:
+                edit_income(current_config)
+            elif choice == 18:
+                edit_bill(current_config)
+            elif choice == 19:
                 edit_credit_card(current_config)
             pause()
             continue
@@ -682,9 +690,9 @@ def run_interactive_mode(config_path: str = "financial_config.json"):
             clear_screen()
             print(f"\n❌ Config file not found: {current_config}\n")
             print(
-                "Please run the Full Setup Wizard (option 18) to create your configuration,"
+                "Please run the Full Setup Wizard (option 20) to create your configuration,"
             )
-            print("or Load Previous Config (option 19) to use an existing one.")
+            print("or Load Previous Config (option 21) to use an existing one.")
             pause()
             continue
         except Exception as e:

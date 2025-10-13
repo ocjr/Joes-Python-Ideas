@@ -17,6 +17,8 @@ from models import (
     Frequency,
     PayoffStrategy,
     IncomeSplit,
+    ManualPayment,
+    RecurringExpense,
 )
 from config_loader import save_config, load_config
 
@@ -711,6 +713,161 @@ def add_credit_card_to_config(config_path: str = "financial_config.json"):
     print(
         f"\n✓ Added {name}: ${balance:,.2f} / ${credit_limit:,.2f} @ {apr_percent:.2f}% APR"
     )
+    print(f"✓ Configuration updated!\n")
+    return True
+
+
+def add_manual_payment_to_config(config_path: str = "financial_config.json"):
+    """Add a single manual payment to existing config."""
+    try:
+        config = load_config(config_path)
+    except FileNotFoundError:
+        print(f"❌ Config file not found: {config_path}")
+        return False
+    except Exception as e:
+        print(f"❌ Error loading config: {e}")
+        return False
+
+    print_header("Add Manual Payment")
+    print("Schedule a one-time payment to a credit card.\n")
+
+    # Check if there are any credit cards
+    if not config.credit_cards:
+        print("❌ No credit cards found. Please add a credit card first.\n")
+        return False
+
+    name = get_input("Payment description (e.g., 'Extra Payment', 'Bonus Payment')")
+    amount = get_input("Payment amount", input_type=float)
+
+    # Select which credit card to pay
+    print("\nWhich credit card are you paying?")
+    card_labels = [
+        f"{cc.name} (balance: ${cc.balance:,.2f})" for cc in config.credit_cards
+    ]
+    selected_label = get_choice("Select credit card:", card_labels)
+    selected_idx = card_labels.index(selected_label)
+    credit_card_id = config.credit_cards[selected_idx].id
+
+    # Get payment date
+    print("\nWhen will you make this payment?")
+    year = get_input("  Year", default=date.today().year, input_type=int)
+    month = get_input("  Month (1-12)", input_type=int)
+    day = get_input("  Day (1-31)", input_type=int)
+
+    try:
+        payment_date = date(year, month, day)
+    except ValueError:
+        print("  ⚠️  Invalid date, using today")
+        payment_date = date.today()
+
+    # Select which checking account to pay from
+    payment_account = None
+    checking_accounts = [acc for acc in config.accounts if acc.type.value == "checking"]
+    if checking_accounts:
+        print("\nWhich account will you pay from?")
+        acc_labels = [
+            f"{acc.name} (balance: ${acc.balance:,.2f})" for acc in checking_accounts
+        ]
+        selected_label = get_choice("Select account:", acc_labels)
+        selected_idx = acc_labels.index(selected_label)
+        payment_account = checking_accounts[selected_idx].id
+
+    payment_id = f"manual_{credit_card_id}_{payment_date.isoformat()}"
+
+    new_payment = ManualPayment(
+        id=payment_id,
+        name=name,
+        amount=amount,
+        payment_date=payment_date,
+        credit_card_id=credit_card_id,
+        payment_account=payment_account,
+    )
+
+    config.manual_payments.append(new_payment)
+    save_config(config, config_path)
+
+    print(f"\n✓ Added manual payment: {name} ${amount:,.2f} on {payment_date}")
+    print(f"✓ Configuration updated!\n")
+    return True
+
+
+def add_recurring_expense_to_config(config_path: str = "financial_config.json"):
+    """Add a single recurring expense to existing config."""
+    try:
+        config = load_config(config_path)
+    except FileNotFoundError:
+        print(f"❌ Config file not found: {config_path}")
+        return False
+    except Exception as e:
+        print(f"❌ Error loading config: {e}")
+        return False
+
+    print_header("Add Recurring Expense")
+    print("Track regular spending like groceries, gas, dining, etc.\n")
+
+    name = get_input("Expense name (e.g., 'Groceries', 'Gas', 'Dining Out')")
+    amount = get_input("Average amount per occurrence", input_type=float)
+    frequency = get_choice(
+        "How often does this occur?", ["weekly", "biweekly", "monthly", "quarterly"]
+    )
+
+    category = get_choice(
+        "Category:",
+        ["food", "transportation", "entertainment", "shopping", "personal", "other"],
+        allow_cancel=True,
+    )
+
+    # Ask if paid by credit or checking
+    print("\nHow do you pay for this expense?")
+    payment_sources = []
+
+    # Add checking accounts
+    for acc in config.accounts:
+        if acc.type.value == "checking":
+            payment_sources.append((acc.id, f"Checking: {acc.name}", False))
+
+    # Add credit cards
+    for cc in config.credit_cards:
+        payment_sources.append((cc.id, f"Credit Card: {cc.name}", True))
+
+    if payment_sources:
+        source_labels = [label for _, label, _ in payment_sources]
+        selected_label = get_choice("Select payment method:", source_labels)
+        selected_idx = source_labels.index(selected_label)
+        payment_account, _, paid_by_credit = payment_sources[selected_idx]
+    else:
+        payment_account = None
+        paid_by_credit = False
+
+    # Get next occurrence date
+    print("\nWhen does this expense next occur?")
+    year = get_input("  Year", default=date.today().year, input_type=int)
+    month = get_input("  Month (1-12)", input_type=int)
+    day = get_input("  Day (1-31)", input_type=int)
+
+    try:
+        next_date = date(year, month, day)
+    except ValueError:
+        print("  ⚠️  Invalid date, using today")
+        next_date = date.today()
+
+    expense_id = name.lower().replace(" ", "_")
+
+    new_expense = RecurringExpense(
+        id=expense_id,
+        name=name,
+        amount=amount,
+        frequency=Frequency(frequency),
+        payment_account=payment_account,
+        paid_by_credit=paid_by_credit,
+        category=category,
+        next_date=next_date,
+    )
+
+    config.recurring_expenses.append(new_expense)
+    save_config(config, config_path)
+
+    print(f"\n✓ Added recurring expense: {name} ${amount:,.2f} {frequency}")
     print(f"✓ Configuration updated!\n")
     return True
 
