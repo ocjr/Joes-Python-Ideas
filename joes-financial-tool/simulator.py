@@ -218,6 +218,10 @@ class FinancialSimulator:
                     )
                 else:
                     # Bill paid from checking/savings
+                    # Check if bill requires checking payment (no credit allowed)
+                    can_use_credit = (
+                        not bill.require_checking
+                    )  # If require_checking is True, can_use_credit must be False
                     transactions.append(
                         PlannedTransaction(
                             date=next_due,
@@ -226,7 +230,7 @@ class FinancialSimulator:
                             category="bill",
                             required=True,
                             preferred_account=bill.payment_account,
-                            can_use_credit=True,  # Can optionally use credit if cash is low
+                            can_use_credit=can_use_credit,  # Respect require_checking flag
                         )
                     )
 

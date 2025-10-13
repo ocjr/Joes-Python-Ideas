@@ -102,6 +102,9 @@ class Bill:
     payment_account: Optional[str] = None  # Account ID or credit card ID
     category: Optional[str] = None
     paid_by_credit: bool = False  # True if payment_account is a credit card
+    require_checking: bool = (
+        False  # True if this bill MUST be paid from checking (no credit allowed)
+    )
     last_paid: Optional[date] = None  # Last date this bill was paid
 
     def __post_init__(self):

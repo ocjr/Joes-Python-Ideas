@@ -229,6 +229,14 @@ def print_optimal_simulation(optimizer: FinancialOptimizer, days: int = 30):
     print(f"\n📋 Day-by-Day Transactions (next {days_to_show} days):")
     for day in optimal.days[:days_to_show]:
         print(f"\n   {day.date.strftime('%a %m/%d')}:")
+
+        # Show balances at start of day
+        checking_balance = day.starting_state.get_total_checking()
+        debt_balance = day.starting_state.get_total_debt()
+        print(
+            f"      Starting: Checking ${checking_balance:,.2f} | Debt ${debt_balance:,.2f}"
+        )
+
         if not day.transactions or all(txn.amount == 0 for txn, _ in day.transactions):
             print(f"      (no transactions)")
         else:
@@ -240,14 +248,72 @@ def print_optimal_simulation(optimizer: FinancialOptimizer, days: int = 30):
                     else:
                         method_str = ""
                         if decision.method.value == "checking":
-                            method_str = " [Checking]"
+                            # Find the account name
+                            account_name = "Checking"
+                            if decision.checking_account_id:
+                                acc = next(
+                                    (
+                                        a
+                                        for a in optimizer.config.accounts
+                                        if a.id == decision.checking_account_id
+                                    ),
+                                    None,
+                                )
+                                if acc:
+                                    account_name = acc.name
+                            method_str = f" [from {account_name}]"
                         elif decision.method.value == "credit_card":
-                            method_str = f" [Credit]"
+                            # Find the card name
+                            card_name = "Credit"
+                            if decision.credit_card_id:
+                                cc = next(
+                                    (
+                                        c
+                                        for c in optimizer.config.credit_cards
+                                        if c.id == decision.credit_card_id
+                                    ),
+                                    None,
+                                )
+                                if cc:
+                                    card_name = cc.name
+                            method_str = f" [using {card_name}]"
                         elif decision.method.value == "split":
-                            method_str = f" [Split: ${decision.checking_amount:.0f} checking + ${decision.credit_amount:.0f} credit]"
+                            # Show both accounts
+                            checking_name = "Checking"
+                            if decision.checking_account_id:
+                                acc = next(
+                                    (
+                                        a
+                                        for a in optimizer.config.accounts
+                                        if a.id == decision.checking_account_id
+                                    ),
+                                    None,
+                                )
+                                if acc:
+                                    checking_name = acc.name
+                            card_name = "Credit"
+                            if decision.credit_card_id:
+                                cc = next(
+                                    (
+                                        c
+                                        for c in optimizer.config.credit_cards
+                                        if c.id == decision.credit_card_id
+                                    ),
+                                    None,
+                                )
+                                if cc:
+                                    card_name = cc.name
+                            method_str = f" [Split: ${decision.checking_amount:.0f} from {checking_name} + ${decision.credit_amount:.0f} using {card_name}]"
                         print(f"      • {txn.description}: -{amount_str}{method_str}")
                         if decision.reason and "⚠️" in decision.reason:
                             print(f"        {decision.reason}")
+
+        # Show balances at end of day
+        ending_checking = day.ending_state.get_total_checking()
+        ending_debt = day.ending_state.get_total_debt()
+        print(
+            f"      Ending:   Checking ${ending_checking:,.2f} | Debt ${ending_debt:,.2f}"
+        )
 
     print()
 

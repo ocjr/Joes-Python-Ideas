@@ -94,7 +94,8 @@
       "autopay": true,
       "payment_account": "checking_main",
       "category": "insurance",
-      "paid_by_credit": false
+      "paid_by_credit": false,
+      "require_checking": true
     },
     {
       "id": "streaming",

@@ -174,6 +174,7 @@ def save_config(config: FinancialConfig, config_path: Union[str, Path]) -> None:
                 "payment_account": bill.payment_account,
                 "category": bill.category,
                 "paid_by_credit": bill.paid_by_credit,
+                "require_checking": bill.require_checking,
                 "last_paid": bill.last_paid.isoformat() if bill.last_paid else None,
             }
             for bill in config.bills
