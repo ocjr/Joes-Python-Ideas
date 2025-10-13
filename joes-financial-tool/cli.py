@@ -35,6 +35,85 @@ def clear_screen():
     os.system("clear" if os.name == "posix" else "cls")
 
 
+def combine_payments_for_display(transactions, credit_cards):
+    """
+    Combine multiple payments to the same credit card for display purposes.
+
+    Banks typically prefer a single payment per day. This combines payments
+    at the display level so users see a single combined payment.
+    """
+    from simulator import PlannedTransaction, PaymentDecision, PaymentMethod
+
+    payment_categories = ["cc_payment", "manual_cc_payment", "cc_extra_payment"]
+    combined = []
+    skip_indices = set()
+
+    for i, (txn, decision) in enumerate(transactions):
+        if i in skip_indices:
+            continue
+
+        # Only combine payment transactions
+        if txn.category not in payment_categories:
+            combined.append((txn, decision))
+            continue
+
+        # Extract card ID from description
+        card_id = None
+        if "(" in txn.description and ")" in txn.description:
+            start = txn.description.rfind("(")
+            end = txn.description.rfind(")")
+            if start != -1 and end != -1:
+                card_id = txn.description[start + 1 : end]
+
+        if not card_id:
+            combined.append((txn, decision))
+            continue
+
+        # Find all other payments to this card on the same day
+        same_card_payments = [(txn, decision)]
+        for j, (other_txn, other_decision) in enumerate(transactions):
+            if j <= i or j in skip_indices:
+                continue
+
+            if other_txn.category in payment_categories:
+                # Check if same card
+                other_card_id = None
+                if "(" in other_txn.description and ")" in other_txn.description:
+                    start = other_txn.description.rfind("(")
+                    end = other_txn.description.rfind(")")
+                    if start != -1 and end != -1:
+                        other_card_id = other_txn.description[start + 1 : end]
+
+                if other_card_id == card_id:
+                    same_card_payments.append((other_txn, other_decision))
+                    skip_indices.add(j)
+
+        # If multiple payments found, combine them
+        if len(same_card_payments) > 1:
+            total_amount = sum(abs(t.amount) for t, d in same_card_payments)
+            # Get card name
+            cc = next((c for c in credit_cards if c.id == card_id), None)
+            card_name = cc.name if cc else card_id
+
+            # Create combined payment
+            combined_txn = PlannedTransaction(
+                date=txn.date,
+                description=f"Combined Payment: {card_name} ({len(same_card_payments)} payments)",
+                amount=-total_amount,
+                category="cc_payment",
+                required=True,
+                preferred_account=txn.preferred_account,
+                can_use_credit=False,
+            )
+
+            # Use the decision from the first payment
+            combined.append((combined_txn, decision))
+        else:
+            combined.append((txn, decision))
+
+    return combined
+
+
 def print_header(title: str):
     """Print a formatted header."""
     print(f"\n{'=' * 70}")
@@ -258,7 +337,12 @@ def print_optimal_simulation(optimizer: FinancialOptimizer, days: int = 30):
         if not day.transactions or all(txn.amount == 0 for txn, _ in day.transactions):
             print(f"      (no transactions)")
         else:
-            for txn, decision in day.transactions:
+            # Combine payments to same card on same day for display
+            combined_transactions = combine_payments_for_display(
+                day.transactions, optimizer.config.credit_cards
+            )
+
+            for txn, decision in combined_transactions:
                 if txn.amount != 0:
                     amount_str = f"${abs(txn.amount):.2f}"
                     if txn.amount > 0:
@@ -466,8 +550,11 @@ def print_cash_flow_forecast(optimizer: FinancialOptimizer):
             f"{day_str:<12} ${starting_checking:>9,.2f} {events_str:>8} ${ending_checking:>9,.2f}  {status}"
         )
 
-        # Show transaction details
-        for txn, decision in day.transactions:
+        # Show transaction details - combine payments first
+        combined_txns = combine_payments_for_display(
+            day.transactions, optimizer.config.credit_cards
+        )
+        for txn, decision in combined_txns:
             if txn.amount != 0:
                 symbol = "+" if txn.amount > 0 else "-"
                 # Clean up description

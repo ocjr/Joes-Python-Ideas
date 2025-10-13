@@ -570,12 +570,116 @@ class FinancialSimulator:
         best_account = self.select_best_checking_account(
             checking_accounts, state, expense_amount
         )
+
+        # Calculate what the balance will be after payment
+        warning_reason = "⚠️ WARNING: May violate minimum balance"
+        if best_account:
+            acc = next((a for a in self.config.accounts if a.id == best_account), None)
+            if acc:
+                current_balance = state.account_balances.get(best_account, 0)
+                new_balance = current_balance - expense_amount
+                warning_reason = f"⚠️ WARNING: {acc.name} may drop to ${new_balance:,.2f} (min ${acc.minimum_balance:,.2f})"
+
         return PaymentDecision(
             method=PaymentMethod.CHECKING,
             checking_amount=expense_amount,
             checking_account_id=best_account,
-            reason="⚠️ WARNING: May violate minimum balance",
+            reason=warning_reason,
         )
+
+    def combine_same_day_payments(
+        self, transactions: list[PlannedTransaction]
+    ) -> list[PlannedTransaction]:
+        """
+        Combine multiple payments to the same credit card on the same day.
+
+        Banks typically prefer a single payment per day rather than multiple
+        small payments. This combines cc_payment, manual_cc_payment, and
+        cc_extra_payment transactions to the same card on the same date.
+
+        Parameters
+        ----------
+        transactions : list[PlannedTransaction]
+            Original list of transactions
+
+        Returns
+        -------
+        list[PlannedTransaction]
+            Modified list with combined payments
+        """
+        # Group transactions by date and card for payment categories
+        payment_categories = ["cc_payment", "manual_cc_payment", "cc_extra_payment"]
+        combined = []
+        skip_indices = set()
+
+        for i, txn in enumerate(transactions):
+            if i in skip_indices:
+                continue
+
+            # Only combine payment transactions
+            if txn.category not in payment_categories:
+                combined.append(txn)
+                continue
+
+            # Extract card ID from description (format: "...(cc_id)..." or "...to Card Name")
+            card_id = None
+            if "(" in txn.description and ")" in txn.description:
+                # Extract from parentheses: "CC Payment: Visa Card (cc_visa)"
+                start = txn.description.rfind("(")
+                end = txn.description.rfind(")")
+                if start != -1 and end != -1:
+                    card_id = txn.description[start + 1 : end]
+
+            if not card_id:
+                combined.append(txn)
+                continue
+
+            # Find all other payments to this card on the same day
+            same_card_payments = [txn]
+            for j, other_txn in enumerate(transactions):
+                if j <= i or j in skip_indices:
+                    continue
+
+                if (
+                    other_txn.date == txn.date
+                    and other_txn.category in payment_categories
+                ):
+                    # Check if same card
+                    other_card_id = None
+                    if "(" in other_txn.description and ")" in other_txn.description:
+                        start = other_txn.description.rfind("(")
+                        end = other_txn.description.rfind(")")
+                        if start != -1 and end != -1:
+                            other_card_id = other_txn.description[start + 1 : end]
+
+                    if other_card_id == card_id:
+                        same_card_payments.append(other_txn)
+                        skip_indices.add(j)
+
+            # If multiple payments found, combine them
+            if len(same_card_payments) > 1:
+                total_amount = sum(abs(p.amount) for p in same_card_payments)
+                # Get card name
+                cc = next(
+                    (c for c in self.config.credit_cards if c.id == card_id), None
+                )
+                card_name = cc.name if cc else card_id
+
+                # Create combined payment
+                combined_txn = PlannedTransaction(
+                    date=txn.date,
+                    description=f"Combined Payment: {card_name} ({card_id}) - {len(same_card_payments)} payments",
+                    amount=-total_amount,
+                    category="cc_payment",  # Use standard payment category
+                    required=True,
+                    preferred_account=txn.preferred_account,
+                    can_use_credit=False,
+                )
+                combined.append(combined_txn)
+            else:
+                combined.append(txn)
+
+        return combined
 
     def calculate_daily_interest(self, state: FinancialState) -> float:
         """Calculate interest accrued for one day on all credit cards."""
