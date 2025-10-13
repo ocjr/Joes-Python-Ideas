@@ -230,12 +230,26 @@ def print_optimal_simulation(optimizer: FinancialOptimizer, days: int = 30):
     for day in optimal.days[:days_to_show]:
         print(f"\n   {day.date.strftime('%a %m/%d')}:")
 
-        # Show balances at start of day
-        checking_balance = day.starting_state.get_total_checking()
+        # Show balances at start of day - individual checking accounts
+        checking_accounts = [
+            acc for acc in optimizer.config.accounts if acc.type.value == "checking"
+        ]
         debt_balance = day.starting_state.get_total_debt()
-        print(
-            f"      Starting: Checking ${checking_balance:,.2f} | Debt ${debt_balance:,.2f}"
-        )
+
+        if len(checking_accounts) > 1:
+            # Multiple checking accounts - show each individually
+            checking_parts = []
+            for acc in checking_accounts:
+                balance = day.starting_state.account_balances.get(acc.id, 0)
+                checking_parts.append(f"{acc.name} ${balance:,.2f}")
+            checking_str = ", ".join(checking_parts)
+            print(f"      Starting: {checking_str} | Debt ${debt_balance:,.2f}")
+        else:
+            # Single checking account - show total
+            checking_balance = day.starting_state.get_total_checking()
+            print(
+                f"      Starting: Checking ${checking_balance:,.2f} | Debt ${debt_balance:,.2f}"
+            )
 
         if not day.transactions or all(txn.amount == 0 for txn, _ in day.transactions):
             print(f"      (no transactions)")
@@ -308,12 +322,23 @@ def print_optimal_simulation(optimizer: FinancialOptimizer, days: int = 30):
                         if decision.reason and "⚠️" in decision.reason:
                             print(f"        {decision.reason}")
 
-        # Show balances at end of day
-        ending_checking = day.ending_state.get_total_checking()
+        # Show balances at end of day - individual checking accounts
         ending_debt = day.ending_state.get_total_debt()
-        print(
-            f"      Ending:   Checking ${ending_checking:,.2f} | Debt ${ending_debt:,.2f}"
-        )
+
+        if len(checking_accounts) > 1:
+            # Multiple checking accounts - show each individually
+            ending_parts = []
+            for acc in checking_accounts:
+                balance = day.ending_state.account_balances.get(acc.id, 0)
+                ending_parts.append(f"{acc.name} ${balance:,.2f}")
+            ending_str = ", ".join(ending_parts)
+            print(f"      Ending:   {ending_str} | Debt ${ending_debt:,.2f}")
+        else:
+            # Single checking account - show total
+            ending_checking = day.ending_state.get_total_checking()
+            print(
+                f"      Ending:   Checking ${ending_checking:,.2f} | Debt ${ending_debt:,.2f}"
+            )
 
     print()
 
