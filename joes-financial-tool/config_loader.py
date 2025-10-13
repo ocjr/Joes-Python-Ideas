@@ -16,6 +16,8 @@ from models import (
     Bill,
     CreditCard,
     Settings,
+    ManualPayment,
+    RecurringExpense,
 )
 
 
@@ -84,6 +86,16 @@ def load_config(config_path: Union[str, Path]) -> FinancialConfig:
         # Parse credit cards
         credit_cards = [CreditCard(**cc) for cc in data.get("credit_cards", [])]
 
+        # Parse manual payments
+        manual_payments = [
+            ManualPayment(**mp) for mp in data.get("manual_payments", [])
+        ]
+
+        # Parse recurring expenses
+        recurring_expenses = [
+            RecurringExpense(**exp) for exp in data.get("recurring_expenses", [])
+        ]
+
         # Parse settings
         settings_data = data.get("settings", {})
         settings = Settings(**settings_data)
@@ -94,6 +106,8 @@ def load_config(config_path: Union[str, Path]) -> FinancialConfig:
             bills=bills,
             credit_cards=credit_cards,
             settings=settings,
+            manual_payments=manual_payments,
+            recurring_expenses=recurring_expenses,
         )
     except (KeyError, TypeError, ValueError) as e:
         raise ValueError(f"Error parsing configuration: {e}") from e
@@ -193,6 +207,30 @@ def save_config(config: FinancialConfig, config_path: Union[str, Path]) -> None:
                 "primary_for_purchases": cc.primary_for_purchases,
             }
             for cc in config.credit_cards
+        ],
+        "manual_payments": [
+            {
+                "id": mp.id,
+                "name": mp.name,
+                "amount": mp.amount,
+                "payment_date": mp.payment_date.isoformat(),
+                "credit_card_id": mp.credit_card_id,
+                "payment_account": mp.payment_account,
+            }
+            for mp in config.manual_payments
+        ],
+        "recurring_expenses": [
+            {
+                "id": exp.id,
+                "name": exp.name,
+                "amount": exp.amount,
+                "frequency": exp.frequency.value,
+                "payment_account": exp.payment_account,
+                "paid_by_credit": exp.paid_by_credit,
+                "category": exp.category,
+                "next_date": exp.next_date.isoformat() if exp.next_date else None,
+            }
+            for exp in config.recurring_expenses
         ],
         "settings": {
             "emergency_fund_target": config.settings.emergency_fund_target,

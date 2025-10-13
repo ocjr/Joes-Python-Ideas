@@ -171,6 +171,42 @@ class CreditCard:
 
 
 @dataclass
+class ManualPayment:
+    """Represents a one-time manual payment to a credit card."""
+
+    id: str
+    name: str
+    amount: float
+    payment_date: date
+    credit_card_id: str  # Which card to pay
+    payment_account: Optional[str] = None  # Which checking account to pay from
+
+    def __post_init__(self):
+        if isinstance(self.payment_date, str):
+            self.payment_date = datetime.strptime(self.payment_date, "%Y-%m-%d").date()
+
+
+@dataclass
+class RecurringExpense:
+    """Represents recurring spending like groceries, gas, etc."""
+
+    id: str
+    name: str
+    amount: float  # Average amount per occurrence
+    frequency: Frequency = Frequency.WEEKLY
+    payment_account: Optional[str] = None  # Account ID or credit card ID
+    paid_by_credit: bool = False  # True if payment_account is a credit card
+    category: Optional[str] = None
+    next_date: Optional[date] = None  # When this expense next occurs
+
+    def __post_init__(self):
+        if isinstance(self.frequency, str):
+            self.frequency = Frequency(self.frequency)
+        if self.next_date and isinstance(self.next_date, str):
+            self.next_date = datetime.strptime(self.next_date, "%Y-%m-%d").date()
+
+
+@dataclass
 class Settings:
     """Optimization settings."""
 
@@ -192,3 +228,11 @@ class FinancialConfig:
     bills: list[Bill]
     credit_cards: list[CreditCard]
     settings: Settings
+    manual_payments: list[ManualPayment] = None
+    recurring_expenses: list[RecurringExpense] = None
+
+    def __post_init__(self):
+        if self.manual_payments is None:
+            self.manual_payments = []
+        if self.recurring_expenses is None:
+            self.recurring_expenses = []

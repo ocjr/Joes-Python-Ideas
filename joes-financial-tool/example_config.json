@@ -144,6 +144,48 @@
       "payment_account": "checking_main"
     }
   ],
+  "manual_payments": [
+    {
+      "id": "extra_visa_payment",
+      "name": "Extra Visa Payment",
+      "amount": 200.00,
+      "payment_date": "2025-10-18",
+      "credit_card_id": "cc_visa",
+      "payment_account": "checking_main"
+    }
+  ],
+  "recurring_expenses": [
+    {
+      "id": "groceries",
+      "name": "Groceries",
+      "amount": 150.00,
+      "frequency": "weekly",
+      "payment_account": "cc_visa",
+      "paid_by_credit": true,
+      "category": "food",
+      "next_date": "2025-10-13"
+    },
+    {
+      "id": "gas",
+      "name": "Gas",
+      "amount": 60.00,
+      "frequency": "weekly",
+      "payment_account": "cc_visa",
+      "paid_by_credit": true,
+      "category": "transportation",
+      "next_date": "2025-10-14"
+    },
+    {
+      "id": "dining_out",
+      "name": "Dining Out",
+      "amount": 100.00,
+      "frequency": "weekly",
+      "payment_account": "checking_main",
+      "paid_by_credit": false,
+      "category": "food",
+      "next_date": "2025-10-16"
+    }
+  ],
   "settings": {
     "emergency_fund_target": 1000.00,
     "planning_horizon_days": 30,

@@ -267,6 +267,104 @@ class FinancialSimulator:
                         )
                     )
 
+        # Add manual payments to credit cards
+        for mp in self.config.manual_payments:
+            if self.today <= mp.payment_date <= end_date:
+                # Find the credit card being paid
+                cc = next(
+                    (c for c in self.config.credit_cards if c.id == mp.credit_card_id),
+                    None,
+                )
+                cc_name = cc.name if cc else mp.credit_card_id
+
+                transactions.append(
+                    PlannedTransaction(
+                        date=mp.payment_date,
+                        description=f"Manual Payment: {mp.name} to {cc_name}",
+                        amount=-mp.amount,
+                        category="manual_cc_payment",
+                        required=True,
+                        preferred_account=mp.payment_account,
+                        can_use_credit=False,  # Can't pay CC with another CC
+                    )
+                )
+
+        # Add recurring expenses
+        for expense in self.config.recurring_expenses:
+            # Determine starting date for this expense
+            if expense.next_date:
+                current_date = expense.next_date
+            else:
+                # If no next_date specified, start from the beginning of simulation
+                current_date = self.today
+
+            # Generate occurrences within the date range
+            while current_date <= end_date:
+                if current_date >= self.today:
+                    # Determine if this is paid by credit card or checking
+                    if expense.paid_by_credit:
+                        # Charged to credit card - use recurring_expense_credit category
+                        # regardless of user-specified category
+                        transactions.append(
+                            PlannedTransaction(
+                                date=current_date,
+                                description=f"Expense: {expense.name}",
+                                amount=-expense.amount,
+                                category="recurring_expense_credit",
+                                required=True,
+                                preferred_account=expense.payment_account,
+                                can_use_credit=False,  # Already on credit
+                            )
+                        )
+                    else:
+                        # Paid from checking/savings - use user-specified category or default
+                        transactions.append(
+                            PlannedTransaction(
+                                date=current_date,
+                                description=f"Expense: {expense.name}",
+                                amount=-expense.amount,
+                                category=expense.category or "recurring_expense",
+                                required=True,
+                                preferred_account=expense.payment_account,
+                                can_use_credit=True,  # Could use credit if needed
+                            )
+                        )
+
+                # Calculate next occurrence
+                if expense.frequency.value == "weekly":
+                    current_date = current_date + timedelta(days=7)
+                elif expense.frequency.value == "biweekly":
+                    current_date = current_date + timedelta(days=14)
+                elif expense.frequency.value == "semi-monthly":
+                    # Approximate as 15 days
+                    current_date = current_date + timedelta(days=15)
+                elif expense.frequency.value == "monthly":
+                    # Move to same day next month
+                    if current_date.month == 12:
+                        current_date = current_date.replace(
+                            year=current_date.year + 1, month=1
+                        )
+                    else:
+                        try:
+                            current_date = current_date.replace(
+                                month=current_date.month + 1
+                            )
+                        except ValueError:
+                            # Handle day overflow (e.g., Jan 31 -> Feb 28)
+                            next_month = current_date.month + 1
+                            year = current_date.year
+                            if next_month > 12:
+                                next_month = 1
+                                year += 1
+                            last_day = calendar.monthrange(year, next_month)[1]
+                            current_date = date(year, next_month, last_day)
+                elif expense.frequency.value == "quarterly":
+                    current_date = current_date + timedelta(days=90)
+                elif expense.frequency.value == "annual":
+                    current_date = current_date.replace(year=current_date.year + 1)
+                else:
+                    break
+
         return sorted(transactions, key=lambda x: x.date)
 
     def select_best_checking_account(
@@ -335,6 +433,15 @@ class FinancialSimulator:
                 credit_card_id=transaction.preferred_account,
                 credit_amount=abs(transaction.amount),
                 reason="Bill charged to credit card",
+            )
+
+        # Recurring expense on credit - already charged to CC, no payment decision needed
+        if transaction.category == "recurring_expense_credit":
+            return PaymentDecision(
+                method=PaymentMethod.CREDIT_CARD,
+                credit_card_id=transaction.preferred_account,
+                credit_amount=abs(transaction.amount),
+                reason="Expense charged to credit card",
             )
 
         expense_amount = abs(transaction.amount)
@@ -561,12 +668,15 @@ class FinancialSimulator:
         """
         preemptive_payments = []
 
-        # Find all bills that will be charged to credit cards today
-        bills_on_credit = [
-            txn for txn in day_transactions if txn.category == "bill_on_credit"
+        # Find all bills and expenses that will be charged to credit cards today
+        charges_on_credit = [
+            txn
+            for txn in day_transactions
+            if txn.category == "bill_on_credit"
+            or txn.category == "recurring_expense_credit"
         ]
 
-        for bill_txn in bills_on_credit:
+        for bill_txn in charges_on_credit:
             cc_id = bill_txn.preferred_account
             if not cc_id:
                 continue
@@ -885,8 +995,11 @@ class FinancialSimulator:
                     or txn.category == "cc_preemptive_payment"
                 )
 
-                # Special case: Bills on credit just add to CC balance
-                if txn.category == "bill_on_credit":
+                # Special case: Bills/expenses on credit just add to CC balance
+                if (
+                    txn.category == "bill_on_credit"
+                    or txn.category == "recurring_expense_credit"
+                ):
                     # Check if the card is already at/over limit - if so, pay from checking instead
                     if (
                         txn.preferred_account
@@ -924,7 +1037,7 @@ class FinancialSimulator:
                             working_state.credit_card_balances[
                                 txn.preferred_account
                             ] += abs(txn.amount)
-                    # No more processing needed for bill_on_credit
+                    # No more processing needed for credit charges
                 elif decision.method == PaymentMethod.CHECKING:
                     # Pay from checking account using the selected account
                     acc_id = decision.checking_account_id
