@@ -69,7 +69,9 @@ class ETFLibrary:
     def get_by_ticker(self, ticker: str) -> Optional[ETFPreset]:
         """Get ETF preset by ticker symbol."""
         ticker_upper = ticker.upper()
-        return next((etf for etf in self.etfs if etf.ticker.upper() == ticker_upper), None)
+        return next(
+            (etf for etf in self.etfs if etf.ticker.upper() == ticker_upper), None
+        )
 
     def search(self, query: str) -> List[ETFPreset]:
         """Search ETFs by ticker, name, or category."""
@@ -133,7 +135,9 @@ def view_etf_library(library_path: str = "etf_presets.json"):
 
         for etf in sorted(categories[category], key=lambda e: e.ticker):
             print(f"  {etf.ticker:6s} - {etf.name}")
-            print(f"         Return: {etf.expected_annual_return*100:5.1f}%  |  Volatility: {etf.annual_volatility*100:5.1f}%  |  Dividend: {etf.annual_dividend_yield*100:5.2f}%  |  Expense: {etf.expense_ratio*100:5.3f}%")
+            print(
+                f"         Return: {etf.expected_annual_return*100:5.1f}%  |  Volatility: {etf.annual_volatility*100:5.1f}%  |  Dividend: {etf.annual_dividend_yield*100:5.2f}%  |  Expense: {etf.expense_ratio*100:5.3f}%"
+            )
             print(f"         {etf.description}")
             print()
 
@@ -179,10 +183,18 @@ def add_etf_interactive(library_path: str = "etf_presets.json"):
         category = "Other"
 
     try:
-        expected_return = float(input("Expected annual return (decimal, e.g., 0.10 for 10%): ").strip())
-        volatility = float(input("Annual volatility (decimal, e.g., 0.15 for 15%): ").strip())
-        dividend_yield = float(input("Annual dividend yield (decimal, e.g., 0.015 for 1.5%): ").strip())
-        expense_ratio = float(input("Expense ratio (decimal, e.g., 0.0009 for 0.09%): ").strip())
+        expected_return = float(
+            input("Expected annual return (decimal, e.g., 0.10 for 10%): ").strip()
+        )
+        volatility = float(
+            input("Annual volatility (decimal, e.g., 0.15 for 15%): ").strip()
+        )
+        dividend_yield = float(
+            input("Annual dividend yield (decimal, e.g., 0.015 for 1.5%): ").strip()
+        )
+        expense_ratio = float(
+            input("Expense ratio (decimal, e.g., 0.0009 for 0.09%): ").strip()
+        )
     except ValueError:
         print("❌ Invalid number format")
         return
@@ -237,7 +249,9 @@ def search_etf_interactive(library_path: str = "etf_presets.json"):
 
     for etf in sorted(results, key=lambda e: e.ticker):
         print(f"  {etf.ticker:6s} - {etf.name} ({etf.category})")
-        print(f"         Return: {etf.expected_annual_return*100:5.1f}%  |  Volatility: {etf.annual_volatility*100:5.1f}%  |  Dividend: {etf.annual_dividend_yield*100:5.2f}%")
+        print(
+            f"         Return: {etf.expected_annual_return*100:5.1f}%  |  Volatility: {etf.annual_volatility*100:5.1f}%  |  Dividend: {etf.annual_dividend_yield*100:5.2f}%"
+        )
         print(f"         {etf.description}")
         print()
 

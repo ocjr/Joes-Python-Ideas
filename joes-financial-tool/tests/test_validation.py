@@ -5,6 +5,7 @@ Test validation and error handling for simulations.
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date
@@ -166,7 +167,9 @@ def test_valid_config():
 
     print(f"\nSimulation configured correctly:")
     print(f"  - Initial balance: ${simulation.initial_balance:,.2f}")
-    print(f"  - Income: {config.income[0].source} (${config.income[0].amount:,.2f}/month)")
+    print(
+        f"  - Income: {config.income[0].source} (${config.income[0].amount:,.2f}/month)"
+    )
     print(f"\nRunning simulation...\n")
 
     try:
@@ -174,7 +177,9 @@ def test_valid_config():
         results = engine.run_monte_carlo(target_age=40)
         print(f"\n✓ Simulation completed successfully!")
         print(f"  Runs: {results.num_runs}")
-        print(f"  Median final value: ${results.get_statistics()['final_value']['median']:,.2f}")
+        print(
+            f"  Median final value: ${results.get_statistics()['final_value']['median']:,.2f}"
+        )
     except Exception as e:
         print(f"\n❌ Error: {e}")
 

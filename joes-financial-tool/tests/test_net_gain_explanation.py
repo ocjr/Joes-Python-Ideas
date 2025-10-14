@@ -7,6 +7,7 @@ Shows exactly what the numbers mean in the float strategy.
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date
@@ -81,6 +82,7 @@ def explain_net_gain():
 
     # Disable Rust for detailed events
     import simulation_engine
+
     original_rust = simulation_engine.RUST_AVAILABLE
     simulation_engine.RUST_AVAILABLE = False
 
@@ -110,7 +112,9 @@ def explain_net_gain():
 
         print(f"💰 MONEY IN (Total Invested):")
         print(f"   Initial balance:        ${simulation.initial_balance:>12,.2f}")
-        print(f"   All paychecks invested: ${run.total_invested - simulation.initial_balance:>12,.2f}")
+        print(
+            f"   All paychecks invested: ${run.total_invested - simulation.initial_balance:>12,.2f}"
+        )
         print(f"   {'─' * 40}")
         print(f"   TOTAL INVESTED:         ${run.total_invested:>12,.2f}")
         print()
@@ -119,7 +123,9 @@ def explain_net_gain():
         print(f"   Sold for expenses:      ${run.total_withdrawn:>12,.2f}")
         print(f"   Taxes paid:             ${run.total_taxes_paid:>12,.2f}")
         print(f"   {'─' * 40}")
-        print(f"   TOTAL OUT:              ${run.total_withdrawn + run.total_taxes_paid:>12,.2f}")
+        print(
+            f"   TOTAL OUT:              ${run.total_withdrawn + run.total_taxes_paid:>12,.2f}"
+        )
         print()
 
         print(f"📈 MONEY STILL IN MARKET:")
@@ -140,7 +146,9 @@ def explain_net_gain():
         total_spent = run.total_invested + run.total_taxes_paid
         net_gain = run.net_gain
 
-        print(f"  Net Gain = (${run.final_account_value:,.2f} + ${run.total_withdrawn:,.2f}) - ${run.total_invested:,.2f} - ${run.total_taxes_paid:,.2f}")
+        print(
+            f"  Net Gain = (${run.final_account_value:,.2f} + ${run.total_withdrawn:,.2f}) - ${run.total_invested:,.2f} - ${run.total_taxes_paid:,.2f}"
+        )
         print(f"  Net Gain = ${total_received:,.2f} - ${total_spent:,.2f}")
         print(f"  Net Gain = ${net_gain:,.2f}")
         print()
@@ -154,7 +162,9 @@ def explain_net_gain():
             print(f"✅ You're UP ${net_gain:,.2f}")
             print()
             print(f"   You put in:  ${run.total_invested:,.2f}")
-            print(f"   You got out: ${total_received:,.2f} (withdrawals + remaining shares)")
+            print(
+                f"   You got out: ${total_received:,.2f} (withdrawals + remaining shares)"
+            )
             print(f"   After taxes: ${net_gain:,.2f} profit")
             print()
             gain_pct = (net_gain / run.total_invested) * 100
@@ -196,7 +206,9 @@ def explain_net_gain():
         print()
 
         for i, event in enumerate(run.events[:10], 1):
-            print(f"{i}. {event.date.strftime('%Y-%m-%d')} - {event.event_type.upper()}")
+            print(
+                f"{i}. {event.date.strftime('%Y-%m-%d')} - {event.event_type.upper()}"
+            )
             print(f"   Amount: ${abs(event.amount):,.2f}")
             if event.tax_owed > 0:
                 print(f"   Tax: ${event.tax_owed:.2f}")
@@ -223,7 +235,9 @@ def explain_net_gain():
 
         if annualized_return < simulation.expected_annual_return * 100:
             expected = simulation.expected_annual_return * 100
-            print(f"⚠️  This is LESS than the expected {expected:.0f}% annual return because:")
+            print(
+                f"⚠️  This is LESS than the expected {expected:.0f}% annual return because:"
+            )
             print(f"   - You're not fully invested the whole time")
             print(f"   - Short-term capital gains taxes eat into profits")
             print(f"   - Transaction costs and timing losses")

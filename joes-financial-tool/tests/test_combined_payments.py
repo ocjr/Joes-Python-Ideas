@@ -2,6 +2,7 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 """Test that payments to the same card on the same day are combined."""
 
@@ -26,7 +27,11 @@ all_txns = sim.get_planned_transactions(30)
 print("\nTransactions for Oct 22 BEFORE combining:")
 print("=" * 60)
 for txn in all_txns:
-    if txn.date.day == 22 and "Payment" in txn.description and "Visa" in txn.description:
+    if (
+        txn.date.day == 22
+        and "Payment" in txn.description
+        and "Visa" in txn.description
+    ):
         print(f"  Category: {txn.category}")
         print(f"  Description: {txn.description}")
         print(f"  Amount: ${abs(txn.amount):,.2f}")
@@ -38,7 +43,11 @@ combined_txns = sim.combine_same_day_payments(all_txns)
 print("\nTransactions for Oct 22 AFTER combining:")
 print("=" * 60)
 for txn in combined_txns:
-    if txn.date.day == 22 and "Payment" in txn.description and "Visa" in txn.description:
+    if (
+        txn.date.day == 22
+        and "Payment" in txn.description
+        and "Visa" in txn.description
+    ):
         print(f"  Category: {txn.category}")
         print(f"  Description: {txn.description}")
         print(f"  Amount: ${abs(txn.amount):,.2f}")

@@ -5,6 +5,7 @@ Test that instructions can be generated regardless of simulation engine.
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date
@@ -81,7 +82,9 @@ engine = SimulationEngine(config, sim_config)
 results = engine.run_monte_carlo(target_age=40)
 
 print("\n✅ Rust simulation complete")
-print(f"   Median final value: ${results.get_statistics()['final_value']['median']:,.2f}")
+print(
+    f"   Median final value: ${results.get_statistics()['final_value']['median']:,.2f}"
+)
 print(f"   Events in results:  {len(results.runs[0].events)}")  # Should be 0
 
 print("\n" + "=" * 80)

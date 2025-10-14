@@ -7,6 +7,7 @@ Tests the SPY float strategy simulation with sample income data.
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date
@@ -84,7 +85,9 @@ def test_basic_simulation():
     print(f"  Initial balance: ${simulation.initial_balance:,.2f}")
     print(f"  Income sources: {len(simulation.income_source_ids)}")
     print(f"  Monthly income: ${config.income[0].amount:,.2f}")
-    print(f"  Strategy: {simulation.strategy_type} (liquidate on day {simulation.liquidation_day})")
+    print(
+        f"  Strategy: {simulation.strategy_type} (liquidate on day {simulation.liquidation_day})"
+    )
     print(f"  Expected return: {simulation.expected_annual_return*100:.1f}%")
     print(f"  Volatility: {simulation.annual_volatility*100:.1f}%")
     print(f"  Dividend yield: {simulation.annual_dividend_yield*100:.2f}%")
@@ -121,4 +124,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ TEST FAILED: {e}")
         import traceback
+
         traceback.print_exc()

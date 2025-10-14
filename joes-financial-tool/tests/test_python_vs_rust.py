@@ -5,6 +5,7 @@ Compare Python vs Rust implementations for accuracy and performance.
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date
@@ -145,11 +146,21 @@ final_diff = abs(python_run.final_account_value - rust_run.final_account_value)
 taxes_diff = abs(python_run.total_taxes_paid - rust_run.total_taxes_paid)
 net_diff = abs(python_run.net_gain - rust_run.net_gain)
 
-print(f"  Invested difference:  ${invested_diff:,.2f} ({'✓ MATCH' if invested_diff < 0.01 else '✗ DIFFER'})")
-print(f"  Withdrawn difference: ${withdrawn_diff:,.2f} ({'✓ MATCH' if withdrawn_diff < 0.01 else '✗ DIFFER'})")
-print(f"  Final value diff:     ${final_diff:,.2f} ({'✓ MATCH' if final_diff < 0.01 else '✗ DIFFER'})")
-print(f"  Taxes difference:     ${taxes_diff:,.2f} ({'✓ MATCH' if taxes_diff < 0.01 else '✗ DIFFER'})")
-print(f"  Net gain difference:  ${net_diff:,.2f} ({'✓ MATCH' if net_diff < 0.01 else '✗ DIFFER'})")
+print(
+    f"  Invested difference:  ${invested_diff:,.2f} ({'✓ MATCH' if invested_diff < 0.01 else '✗ DIFFER'})"
+)
+print(
+    f"  Withdrawn difference: ${withdrawn_diff:,.2f} ({'✓ MATCH' if withdrawn_diff < 0.01 else '✗ DIFFER'})"
+)
+print(
+    f"  Final value diff:     ${final_diff:,.2f} ({'✓ MATCH' if final_diff < 0.01 else '✗ DIFFER'})"
+)
+print(
+    f"  Taxes difference:     ${taxes_diff:,.2f} ({'✓ MATCH' if taxes_diff < 0.01 else '✗ DIFFER'})"
+)
+print(
+    f"  Net gain difference:  ${net_diff:,.2f} ({'✓ MATCH' if net_diff < 0.01 else '✗ DIFFER'})"
+)
 print()
 
 print("=" * 80)
@@ -237,7 +248,9 @@ print("=" * 80)
 print("SUMMARY")
 print("=" * 80)
 print()
-print(f"✅ Accuracy: Python and Rust produce {'IDENTICAL' if max(invested_diff, withdrawn_diff, final_diff, taxes_diff, net_diff) < 0.01 else 'SIMILAR'} results")
+print(
+    f"✅ Accuracy: Python and Rust produce {'IDENTICAL' if max(invested_diff, withdrawn_diff, final_diff, taxes_diff, net_diff) < 0.01 else 'SIMILAR'} results"
+)
 print(f"✅ Performance: Rust is {speedup:.1f}x faster than Python")
 print(f"✅ Principal-only strategy: Fully implemented in both!")
 print()

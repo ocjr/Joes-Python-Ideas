@@ -30,7 +30,11 @@ from investment_manager import (
     view_investment_portfolio,
 )
 from simulation_engine import SimulationEngine
-from simulation_reports import print_simulation_summary, print_sample_run, print_actionable_instructions
+from simulation_reports import (
+    print_simulation_summary,
+    print_sample_run,
+    print_actionable_instructions,
+)
 from simulation_wizard import add_simulation_to_config, edit_simulation
 from etf_library import view_etf_library, add_etf_interactive, search_etf_interactive
 from config_manager import (
@@ -738,7 +742,9 @@ def view_simulations(config_path: str):
 
     if not config.simulations:
         print("No simulations configured yet.\n")
-        print("To add a simulation, edit your config file and add to the 'simulations' section.")
+        print(
+            "To add a simulation, edit your config file and add to the 'simulations' section."
+        )
         return
 
     for i, sim in enumerate(config.simulations, 1):
@@ -746,7 +752,9 @@ def view_simulations(config_path: str):
         print(f"{i}. {sim.name} ({status})")
         print(f"   ID: {sim.id}")
         print(f"   Initial balance: ${sim.initial_balance:,.2f}")
-        print(f"   Current age: {sim.current_age} → Target ages: {', '.join(map(str, sim.target_ages))}")
+        print(
+            f"   Current age: {sim.current_age} → Target ages: {', '.join(map(str, sim.target_ages))}"
+        )
         print(f"   Strategy: {sim.strategy_type}")
         if sim.strategy_type == "monthly_liquidation":
             print(f"   Liquidation day: {sim.liquidation_day}")
@@ -755,12 +763,20 @@ def view_simulations(config_path: str):
 
         # Show income sources with validation
         if sim.income_source_ids:
-            matched_sources = [inc for inc in config.income if inc.id in sim.income_source_ids]
-            unmatched_ids = [sid for sid in sim.income_source_ids if sid not in [inc.id for inc in config.income]]
+            matched_sources = [
+                inc for inc in config.income if inc.id in sim.income_source_ids
+            ]
+            unmatched_ids = [
+                sid
+                for sid in sim.income_source_ids
+                if sid not in [inc.id for inc in config.income]
+            ]
 
             print(f"   Income sources: {len(matched_sources)} configured")
             for inc in matched_sources:
-                print(f"      ✓ {inc.source} (${inc.amount:,.2f} {inc.frequency.value})")
+                print(
+                    f"      ✓ {inc.source} (${inc.amount:,.2f} {inc.frequency.value})"
+                )
             if unmatched_ids:
                 print(f"      ⚠️  Unmatched IDs: {', '.join(unmatched_ids)}")
         else:
@@ -799,7 +815,9 @@ def run_simulation_interactive(config_path: str):
 
     # Get user selection
     try:
-        choice = input(f"Select simulation (1-{len(enabled_sims)}, 0 to cancel): ").strip()
+        choice = input(
+            f"Select simulation (1-{len(enabled_sims)}, 0 to cancel): "
+        ).strip()
         if not choice or choice == "0":
             print("Cancelled.")
             return
@@ -834,21 +852,28 @@ def run_simulation_interactive(config_path: str):
     # Estimate time based on which engine will be used
     try:
         import simulation_engine
+
         rust_available = simulation_engine.RUST_AVAILABLE
     except:
         rust_available = False
 
     if rust_available and selected_sim.num_simulations > 10:
         # Rust: ~100,000 runs/sec
-        estimated_time = (selected_sim.num_simulations * years) / 100000 * 60  # in seconds, then to minutes
+        estimated_time = (
+            (selected_sim.num_simulations * years) / 100000 * 60
+        )  # in seconds, then to minutes
         engine_note = " (Rust)"
     else:
         # Python: ~200 runs/sec
         estimated_time = (selected_sim.num_simulations * years) / 200 / 60  # in minutes
         engine_note = " (Python)"
 
-    print(f"\nConfigured simulations: {selected_sim.num_simulations}{engine_note} (estimated ~{estimated_time:.1f} minutes)")
-    override = input(f"Override count for this run? (press Enter to use {selected_sim.num_simulations}): ").strip()
+    print(
+        f"\nConfigured simulations: {selected_sim.num_simulations}{engine_note} (estimated ~{estimated_time:.1f} minutes)"
+    )
+    override = input(
+        f"Override count for this run? (press Enter to use {selected_sim.num_simulations}): "
+    ).strip()
     if override:
         try:
             num_runs = int(override)
@@ -883,8 +908,14 @@ def run_simulation_interactive(config_path: str):
     print(f"\n🔍 Validating simulation configuration...")
 
     if selected_sim.income_source_ids:
-        matched_sources = [inc for inc in config.income if inc.id in selected_sim.income_source_ids]
-        unmatched_ids = [sid for sid in selected_sim.income_source_ids if sid not in [inc.id for inc in config.income]]
+        matched_sources = [
+            inc for inc in config.income if inc.id in selected_sim.income_source_ids
+        ]
+        unmatched_ids = [
+            sid
+            for sid in selected_sim.income_source_ids
+            if sid not in [inc.id for inc in config.income]
+        ]
 
         if unmatched_ids:
             print(f"\n❌ ERROR: Income source IDs not found in config!")
@@ -892,14 +923,18 @@ def run_simulation_interactive(config_path: str):
             print(f"\n   Available income IDs in config:")
             for inc in config.income:
                 print(f"     - {inc.id} ({inc.source})")
-            print(f"\n   Please edit the simulation config (option 30) to fix the income_source_ids.")
+            print(
+                f"\n   Please edit the simulation config (option 30) to fix the income_source_ids."
+            )
             return
 
         if not matched_sources:
             print(f"\n⚠️  WARNING: No income sources configured for this simulation!")
-            print(f"   The simulation will only use the initial balance of ${selected_sim.initial_balance:,.2f}")
+            print(
+                f"   The simulation will only use the initial balance of ${selected_sim.initial_balance:,.2f}"
+            )
             proceed = input(f"   Continue anyway? (y/n): ").strip().lower()
-            if proceed != 'y':
+            if proceed != "y":
                 print("Cancelled.")
                 return
         else:
@@ -907,9 +942,17 @@ def run_simulation_interactive(config_path: str):
             for inc in matched_sources:
                 print(f"    - {inc.source}: ${inc.amount:,.2f} {inc.frequency.value}")
     else:
-        print(f"⚠️  No income sources configured - only initial balance will be invested")
-        proceed = input(f"   Continue with just ${selected_sim.initial_balance:,.2f} initial balance? (y/n): ").strip().lower()
-        if proceed != 'y':
+        print(
+            f"⚠️  No income sources configured - only initial balance will be invested"
+        )
+        proceed = (
+            input(
+                f"   Continue with just ${selected_sim.initial_balance:,.2f} initial balance? (y/n): "
+            )
+            .strip()
+            .lower()
+        )
+        if proceed != "y":
             print("Cancelled.")
             return
 
@@ -933,7 +976,9 @@ def run_simulation_interactive(config_path: str):
         print_simulation_summary(results)
 
         # Ask if they want to see actionable instructions
-        show_instructions = input("\nShow actionable buy/sell instructions? (y/n): ").strip().lower()
+        show_instructions = (
+            input("\nShow actionable buy/sell instructions? (y/n): ").strip().lower()
+        )
         if show_instructions == "y":
             print_actionable_instructions(results, max_instructions=50, config=config)
 
@@ -946,6 +991,7 @@ def run_simulation_interactive(config_path: str):
         export = input("\nExport results to CSV? (y/n): ").strip().lower()
         if export == "y":
             from simulation_reports import export_results_to_csv
+
             filename = f"simulation_{selected_sim.id}_age{target_age}_{date.today().isoformat()}.csv"
             export_results_to_csv(results, filename)
 
@@ -955,6 +1001,7 @@ def run_simulation_interactive(config_path: str):
     except Exception as e:
         print(f"\n❌ Simulation failed: {e}")
         import traceback
+
         traceback.print_exc()
 
 

@@ -5,6 +5,7 @@ Test Rust implementation of principal_only strategy with 1000 simulations.
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date

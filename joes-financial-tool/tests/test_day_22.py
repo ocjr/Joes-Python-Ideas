@@ -2,6 +2,7 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 """Test what happens on day 22 (first CC payment day)."""
 
@@ -18,6 +19,7 @@ result = simulator.run_simulation(OptimizationStrategy.AGGRESSIVE_DEBT, days_ahe
 
 # Find day 10/22
 from datetime import date
+
 target_date = date(2025, 10, 22)
 
 for day_sim in result.days:

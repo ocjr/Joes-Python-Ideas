@@ -5,6 +5,7 @@ Test script for investment account features.
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date
@@ -99,7 +100,9 @@ def test_investment_account_creation():
         )
 
     print("─" * 70)
-    print(f"{'TOTAL':<10} {'':<10} {'':<12} {'':<14} ${inv_account.total_market_value:>13,.2f} ${inv_account.total_gain_loss:>+13,.2f}")
+    print(
+        f"{'TOTAL':<10} {'':<10} {'':<12} {'':<14} ${inv_account.total_market_value:>13,.2f} ${inv_account.total_gain_loss:>+13,.2f}"
+    )
     print(f"\nTotal Account Value: ${inv_account.total_value:,.2f}")
 
     # Test sell transaction
@@ -119,7 +122,9 @@ def test_investment_account_creation():
     print(f"After selling 5 shares of AAPL:")
     for holding in inv_account.holdings:
         if holding.symbol == "AAPL":
-            print(f"  AAPL: {holding.shares:.2f} shares, cost basis: ${holding.cost_basis:,.2f}")
+            print(
+                f"  AAPL: {holding.shares:.2f} shares, cost basis: ${holding.cost_basis:,.2f}"
+            )
 
     print("\n✓ Investment account tests passed!")
     return True
@@ -188,7 +193,9 @@ def test_config_with_investment():
     assert inv_acc.holdings[0].shares == 10.0
 
     print(f"✓ Investment account data verified")
-    print(f"  Holdings: {inv_acc.holdings[0].shares} shares of {inv_acc.holdings[0].symbol}")
+    print(
+        f"  Holdings: {inv_acc.holdings[0].shares} shares of {inv_acc.holdings[0].symbol}"
+    )
     print(f"  Market value: ${inv_acc.total_market_value:,.2f}")
 
     print("\n✓ Config save/load tests passed!")

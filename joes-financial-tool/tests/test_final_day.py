@@ -2,6 +2,7 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 """Check final day of simulation."""
 
@@ -29,6 +30,7 @@ for cc_id, balance in result.final_state.credit_card_balances.items():
 # Check days after 10/22
 print(f"\n\nDays after 10/22 with transactions:")
 from datetime import date
+
 for day_sim in result.days:
     if day_sim.date > date(2025, 10, 22) and day_sim.transactions:
         print(f"\n{day_sim.date}:")

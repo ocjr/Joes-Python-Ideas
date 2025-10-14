@@ -2,6 +2,7 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 """Test CC payment scheduling."""
 
@@ -16,10 +17,13 @@ print(f"Today: {optimizer.today}")
 print(f"\nCredit Cards and Next Due Dates:")
 for cc in config.credit_cards:
     next_due = optimizer.get_next_date(cc.due_day)
-    print(f"  {cc.name}: Due day {cc.due_day}, balance ${cc.balance:.2f}, next due {next_due}")
+    print(
+        f"  {cc.name}: Due day {cc.due_day}, balance ${cc.balance:.2f}, next due {next_due}"
+    )
 
 # Check planned transactions
 from simulator import FinancialSimulator
+
 simulator = FinancialSimulator(config, optimizer.today)
 transactions = simulator.get_planned_transactions(days_ahead=30)
 

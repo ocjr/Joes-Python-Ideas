@@ -2,6 +2,7 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 """Test bills charged to credit cards."""
 
@@ -18,4 +19,6 @@ transactions = simulator.get_planned_transactions(days_ahead=30)
 print("Bills charged to credit cards in next 30 days:")
 for txn in transactions:
     if txn.category == "bill_on_credit":
-        print(f"  {txn.date}: {txn.description} - ${abs(txn.amount):.2f} to {txn.preferred_account}")
+        print(
+            f"  {txn.date}: {txn.description} - ${abs(txn.amount):.2f} to {txn.preferred_account}"
+        )

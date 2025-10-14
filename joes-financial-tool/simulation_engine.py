@@ -16,6 +16,7 @@ from models import FinancialConfig, InvestmentSimulation, Income, Frequency
 # Try to import Rust acceleration module
 try:
     import simulation_rust
+
     RUST_AVAILABLE = True
     print("✓ Rust acceleration available")
 except ImportError:
@@ -52,7 +53,12 @@ class SingleRunResult:
     @property
     def net_gain(self) -> float:
         """Net gain/loss from the strategy."""
-        return self.final_account_value + self.total_withdrawn - self.total_invested - self.total_taxes_paid
+        return (
+            self.final_account_value
+            + self.total_withdrawn
+            - self.total_invested
+            - self.total_taxes_paid
+        )
 
 
 @dataclass
@@ -67,7 +73,9 @@ class MonteCarloResults:
     def num_runs(self) -> int:
         return len(self.runs)
 
-    def get_percentile(self, percentile: float, metric: str = "final_account_value") -> float:
+    def get_percentile(
+        self, percentile: float, metric: str = "final_account_value"
+    ) -> float:
         """Get percentile value for a specific metric."""
         values = sorted([getattr(run, metric) for run in self.runs])
         index = int(len(values) * (percentile / 100.0))
@@ -142,6 +150,7 @@ class SimulationEngine:
                     except ValueError:
                         # Day doesn't exist in next month
                         import calendar
+
                         next_month = current.month + 1
                         year = current.year
                         if next_month > 12:
@@ -173,6 +182,7 @@ class SimulationEngine:
 
             # Handle day overflow (e.g., day 31 in month with 30 days)
             import calendar
+
             last_day = calendar.monthrange(target_year, target_month)[1]
             target_day = min(liquidation_day, last_day)
 
@@ -184,7 +194,9 @@ class SimulationEngine:
 
             return liquidation
 
-    def simulate_price_path(self, start_date: date, end_date: date, start_price: float = 450.0) -> dict[date, float]:
+    def simulate_price_path(
+        self, start_date: date, end_date: date, start_price: float = 450.0
+    ) -> dict[date, float]:
         """
         Simulate SPY price path using geometric Brownian motion.
 
@@ -204,7 +216,7 @@ class SimulationEngine:
             if current_date.weekday() < 5:
                 # Geometric Brownian motion
                 random_shock = random.gauss(0, 1)
-                drift = (daily_return - daily_expense - 0.5 * daily_volatility ** 2)
+                drift = daily_return - daily_expense - 0.5 * daily_volatility**2
                 diffusion = daily_volatility * random_shock
                 price_change = current_price * (drift + diffusion)
                 current_price = max(1.0, current_price + price_change)  # Floor at $1
@@ -214,7 +226,9 @@ class SimulationEngine:
 
         return prices
 
-    def calculate_tax(self, cost_basis: float, sale_proceeds: float, hold_days: int) -> float:
+    def calculate_tax(
+        self, cost_basis: float, sale_proceeds: float, hold_days: int
+    ) -> float:
         """Calculate capital gains tax."""
         gain = sale_proceeds - cost_basis
 
@@ -256,7 +270,9 @@ class SimulationEngine:
 
         return sorted(dividend_dates)
 
-    def run_single_simulation(self, run_number: int, target_age: int) -> SingleRunResult:
+    def run_single_simulation(
+        self, run_number: int, target_age: int
+    ) -> SingleRunResult:
         """Run single Monte Carlo simulation to target age."""
         # Set random seed for reproducibility if specified
         if self.simulation.random_seed is not None:
@@ -270,7 +286,8 @@ class SimulationEngine:
 
         # Get income sources to use
         income_sources = [
-            inc for inc in self.config.income
+            inc
+            for inc in self.config.income
             if inc.id in self.simulation.income_source_ids
         ]
 
@@ -279,15 +296,23 @@ class SimulationEngine:
             if not income_sources and self.simulation.income_source_ids:
                 print(f"\n⚠️  WARNING: No income sources matched!")
                 print(f"   Simulation expects IDs: {self.simulation.income_source_ids}")
-                print(f"   Available income IDs: {[inc.id for inc in self.config.income]}")
-                print(f"   Only the initial balance of ${self.simulation.initial_balance:,.2f} will be invested.\n")
+                print(
+                    f"   Available income IDs: {[inc.id for inc in self.config.income]}"
+                )
+                print(
+                    f"   Only the initial balance of ${self.simulation.initial_balance:,.2f} will be invested.\n"
+                )
             elif not income_sources and self.simulation.initial_balance == 0:
-                raise ValueError("No income sources and no initial balance configured - nothing to invest!")
+                raise ValueError(
+                    "No income sources and no initial balance configured - nothing to invest!"
+                )
 
         # Track state
         events = []
         shares_held = 0.0
-        purchase_lots = []  # List of (lot_id, shares, cost_basis_per_share, purchase_date)
+        purchase_lots = (
+            []
+        )  # List of (lot_id, shares, cost_basis_per_share, purchase_date)
         total_invested = 0.0
         total_withdrawn = 0.0
         total_taxes_paid = 0.0
@@ -298,17 +323,21 @@ class SimulationEngine:
             start_price = prices[self.start_date]
             initial_shares = self.simulation.initial_balance / start_price
             shares_held = initial_shares
-            purchase_lots.append(("initial", initial_shares, start_price, self.start_date))
+            purchase_lots.append(
+                ("initial", initial_shares, start_price, self.start_date)
+            )
             total_invested = self.simulation.initial_balance
 
-            events.append(SimulationEvent(
-                date=self.start_date,
-                event_type='buy',
-                shares=initial_shares,
-                price_per_share=start_price,
-                amount=-self.simulation.initial_balance,
-                notes=f"Initial investment"
-            ))
+            events.append(
+                SimulationEvent(
+                    date=self.start_date,
+                    event_type="buy",
+                    shares=initial_shares,
+                    price_per_share=start_price,
+                    amount=-self.simulation.initial_balance,
+                    notes=f"Initial investment",
+                )
+            )
 
         # Generate all income events with growth applied
         income_events = []
@@ -321,8 +350,14 @@ class SimulationEngine:
 
                 # Apply income growth based on years elapsed
                 years_elapsed = (next_income - self.start_date).days / 365.0
-                growth_periods = int(years_elapsed / self.simulation.income_growth_frequency) if self.simulation.income_growth_frequency > 0 else 0
-                income_multiplier = (1 + self.simulation.income_growth_rate) ** growth_periods
+                growth_periods = (
+                    int(years_elapsed / self.simulation.income_growth_frequency)
+                    if self.simulation.income_growth_frequency > 0
+                    else 0
+                )
+                income_multiplier = (
+                    1 + self.simulation.income_growth_rate
+                ) ** growth_periods
                 adjusted_amount = income_source.amount * income_multiplier
 
                 income_events.append((next_income, adjusted_amount, income_source.id))
@@ -335,8 +370,8 @@ class SimulationEngine:
         dividend_dates = self.generate_dividend_dates(self.start_date, end_date)
 
         # Process events in chronological order (income deposits and dividends)
-        all_events = [(d, 'income', amt, iid) for d, amt, iid in income_events]
-        all_events += [(d, 'dividend', None, None) for d in dividend_dates]
+        all_events = [(d, "income", amt, iid) for d, amt, iid in income_events]
+        all_events += [(d, "dividend", None, None) for d in dividend_dates]
         all_events.sort(key=lambda x: x[0])
 
         for event_date, event_type, event_amount, event_id in all_events:
@@ -344,12 +379,17 @@ class SimulationEngine:
             if event_date.weekday() >= 5:
                 continue
 
-            if event_type == 'dividend':
+            if event_type == "dividend":
                 # Calculate dividend payment based on shares held
                 if shares_held > 0:
                     # Quarterly dividend = annual yield / 4
                     quarterly_yield = self.simulation.annual_dividend_yield / 4.0
-                    current_price = prices.get(event_date, prices[min(prices.keys(), key=lambda d: abs((d - event_date).days))])
+                    current_price = prices.get(
+                        event_date,
+                        prices[
+                            min(prices.keys(), key=lambda d: abs((d - event_date).days))
+                        ],
+                    )
                     dividend_per_share = current_price * quarterly_yield
                     dividend_amount = shares_held * dividend_per_share
 
@@ -364,18 +404,22 @@ class SimulationEngine:
                     if net_dividend > 0:
                         shares_to_buy = net_dividend / current_price
                         lot_id = f"{event_date.isoformat()}_dividend"
-                        purchase_lots.append((lot_id, shares_to_buy, current_price, event_date))
+                        purchase_lots.append(
+                            (lot_id, shares_to_buy, current_price, event_date)
+                        )
                         shares_held += shares_to_buy
 
-                        events.append(SimulationEvent(
-                            date=event_date,
-                            event_type='dividend',
-                            shares=shares_to_buy,
-                            price_per_share=current_price,
-                            amount=dividend_amount,
-                            tax_owed=dividend_tax,
-                            notes=f"Dividend ${dividend_amount:.2f}, reinvested ${net_dividend:.2f}"
-                        ))
+                        events.append(
+                            SimulationEvent(
+                                date=event_date,
+                                event_type="dividend",
+                                shares=shares_to_buy,
+                                price_per_share=current_price,
+                                amount=dividend_amount,
+                                tax_owed=dividend_tax,
+                                notes=f"Dividend ${dividend_amount:.2f}, reinvested ${net_dividend:.2f}",
+                            )
+                        )
 
                 continue
 
@@ -385,7 +429,10 @@ class SimulationEngine:
             income_id = event_id
 
             # BUY: Invest the income
-            buy_price = prices.get(income_date, prices[min(prices.keys(), key=lambda d: abs((d - income_date).days))])
+            buy_price = prices.get(
+                income_date,
+                prices[min(prices.keys(), key=lambda d: abs((d - income_date).days))],
+            )
             shares_to_buy = income_amount / buy_price
 
             # Record purchase lot
@@ -395,14 +442,16 @@ class SimulationEngine:
             shares_held += shares_to_buy
             total_invested += income_amount
 
-            events.append(SimulationEvent(
-                date=income_date,
-                event_type='buy',
-                shares=shares_to_buy,
-                price_per_share=buy_price,
-                amount=-income_amount,
-                notes=f"Invested {income_id} paycheck"
-            ))
+            events.append(
+                SimulationEvent(
+                    date=income_date,
+                    event_type="buy",
+                    shares=shares_to_buy,
+                    price_per_share=buy_price,
+                    amount=-income_amount,
+                    notes=f"Invested {income_id} paycheck",
+                )
+            )
 
             # SELL: Liquidate on next liquidation date (or skip for principal_only)
             # For principal_only strategy, we batch liquidations monthly rather than per-income
@@ -416,7 +465,15 @@ class SimulationEngine:
                 while liquidation_date.weekday() >= 5:
                     liquidation_date += timedelta(days=1)
 
-                sell_price = prices.get(liquidation_date, prices[min(prices.keys(), key=lambda d: abs((d - liquidation_date).days))])
+                sell_price = prices.get(
+                    liquidation_date,
+                    prices[
+                        min(
+                            prices.keys(),
+                            key=lambda d: abs((d - liquidation_date).days),
+                        )
+                    ],
+                )
 
                 # Calculate how many shares to sell to get income_amount back
                 shares_to_sell = min(shares_held, income_amount / sell_price)
@@ -427,8 +484,15 @@ class SimulationEngine:
                 shares_remaining_to_sell = shares_to_sell
                 lots_to_update = []
 
-                for i, (lot_id, lot_shares, lot_cost_basis, lot_purchase_date) in enumerate(purchase_lots):
-                    if shares_remaining_to_sell <= 1e-8:  # Use small epsilon for float comparison
+                for i, (
+                    lot_id,
+                    lot_shares,
+                    lot_cost_basis,
+                    lot_purchase_date,
+                ) in enumerate(purchase_lots):
+                    if (
+                        shares_remaining_to_sell <= 1e-8
+                    ):  # Use small epsilon for float comparison
                         break
 
                     # Determine how many shares from this lot to sell
@@ -440,13 +504,23 @@ class SimulationEngine:
 
                     # Calculate holding period and tax
                     hold_days = (liquidation_date - lot_purchase_date).days
-                    tax_owed += self.calculate_tax(lot_cost, lot_sale_proceeds, hold_days)
+                    tax_owed += self.calculate_tax(
+                        lot_cost, lot_sale_proceeds, hold_days
+                    )
 
                     # Update lot
                     remaining_shares = lot_shares - shares_from_this_lot
                     if remaining_shares > 1e-8:
                         # Partial sale - keep remaining shares
-                        lots_to_update.append((i, lot_id, remaining_shares, lot_cost_basis, lot_purchase_date))
+                        lots_to_update.append(
+                            (
+                                i,
+                                lot_id,
+                                remaining_shares,
+                                lot_cost_basis,
+                                lot_purchase_date,
+                            )
+                        )
                     else:
                         # Full sale - mark for removal
                         lots_to_update.append((i, None, 0, 0, None))
@@ -455,60 +529,95 @@ class SimulationEngine:
 
                 # Apply updates to purchase_lots (in reverse to avoid index issues)
                 new_lots = []
-                for i, (lot_id, lot_shares, lot_cost_basis, lot_purchase_date) in enumerate(purchase_lots):
+                for i, (
+                    lot_id,
+                    lot_shares,
+                    lot_cost_basis,
+                    lot_purchase_date,
+                ) in enumerate(purchase_lots):
                     # Check if this lot was updated
                     updated = False
-                    for update_idx, update_lot_id, update_shares, update_cost, update_date in lots_to_update:
+                    for (
+                        update_idx,
+                        update_lot_id,
+                        update_shares,
+                        update_cost,
+                        update_date,
+                    ) in lots_to_update:
                         if i == update_idx:
                             if update_lot_id is not None:  # Keep remaining shares
-                                new_lots.append((update_lot_id, update_shares, update_cost, update_date))
+                                new_lots.append(
+                                    (
+                                        update_lot_id,
+                                        update_shares,
+                                        update_cost,
+                                        update_date,
+                                    )
+                                )
                             updated = True
                             break
                     if not updated:
-                        new_lots.append((lot_id, lot_shares, lot_cost_basis, lot_purchase_date))
+                        new_lots.append(
+                            (lot_id, lot_shares, lot_cost_basis, lot_purchase_date)
+                        )
 
                 purchase_lots = new_lots
                 shares_held -= shares_to_sell
                 total_withdrawn += sale_proceeds
                 total_taxes_paid += tax_owed
 
-                events.append(SimulationEvent(
-                    date=liquidation_date,
-                    event_type='sell',
-                    shares=shares_to_sell,
-                    price_per_share=sell_price,
-                    amount=sale_proceeds,
-                    tax_owed=tax_owed,
-                    notes=f"Liquidated for expenses (held {(liquidation_date - income_date).days} days)"
-                ))
+                events.append(
+                    SimulationEvent(
+                        date=liquidation_date,
+                        event_type="sell",
+                        shares=shares_to_sell,
+                        price_per_share=sell_price,
+                        amount=sale_proceeds,
+                        tax_owed=tax_owed,
+                        notes=f"Liquidated for expenses (held {(liquidation_date - income_date).days} days)",
+                    )
+                )
 
         # For principal_only strategy, process batched monthly liquidations
         if self.simulation.strategy_type == "principal_only":
             # Group income events by liquidation month and calculate principal to recover
-            liquidation_groups = {}  # {liquidation_date: [(income_date, income_amount), ...]}
+            liquidation_groups = (
+                {}
+            )  # {liquidation_date: [(income_date, income_amount), ...]}
 
             for income_date, income_amount, income_id in income_events:
                 # Calculate NEXT liquidation date after the income date
                 # Start with the liquidation day in the income month
-                liquidation_date = date(income_date.year, income_date.month, self.simulation.liquidation_day)
+                liquidation_date = date(
+                    income_date.year, income_date.month, self.simulation.liquidation_day
+                )
 
                 # Adjust if liquidation_day doesn't exist in this month
                 import calendar
-                last_day = calendar.monthrange(liquidation_date.year, liquidation_date.month)[1]
+
+                last_day = calendar.monthrange(
+                    liquidation_date.year, liquidation_date.month
+                )[1]
                 if self.simulation.liquidation_day > last_day:
                     liquidation_date = liquidation_date.replace(day=last_day)
 
                 # If the liquidation date is on or before the income date, move to next month
                 if liquidation_date <= income_date:
                     if liquidation_date.month == 12:
-                        liquidation_date = date(liquidation_date.year + 1, 1, self.simulation.liquidation_day)
+                        liquidation_date = date(
+                            liquidation_date.year + 1,
+                            1,
+                            self.simulation.liquidation_day,
+                        )
                     else:
                         next_month = liquidation_date.month + 1
-                        last_day_next = calendar.monthrange(liquidation_date.year, next_month)[1]
+                        last_day_next = calendar.monthrange(
+                            liquidation_date.year, next_month
+                        )[1]
                         liquidation_date = date(
                             liquidation_date.year,
                             next_month,
-                            min(self.simulation.liquidation_day, last_day_next)
+                            min(self.simulation.liquidation_day, last_day_next),
                         )
 
                 # Skip weekends
@@ -519,7 +628,9 @@ class SimulationEngine:
                 if self.start_date <= liquidation_date <= end_date:
                     if liquidation_date not in liquidation_groups:
                         liquidation_groups[liquidation_date] = []
-                    liquidation_groups[liquidation_date].append((income_date, income_amount, income_id))
+                    liquidation_groups[liquidation_date].append(
+                        (income_date, income_amount, income_id)
+                    )
 
             # Process each liquidation date
             for liquidation_date in sorted(liquidation_groups.keys()):
@@ -527,7 +638,15 @@ class SimulationEngine:
                 total_principal_to_recover = sum(amt for _, amt, _ in income_list)
 
                 # Get price at liquidation date
-                sell_price = prices.get(liquidation_date, prices[min(prices.keys(), key=lambda d: abs((d - liquidation_date).days))])
+                sell_price = prices.get(
+                    liquidation_date,
+                    prices[
+                        min(
+                            prices.keys(),
+                            key=lambda d: abs((d - liquidation_date).days),
+                        )
+                    ],
+                )
 
                 # Calculate how many shares we need to sell to recover principal
                 # This is the key difference: we only sell enough to get the principal back
@@ -544,7 +663,12 @@ class SimulationEngine:
                 shares_remaining_to_sell = shares_to_sell
                 lots_to_update = []
 
-                for i, (lot_id, lot_shares, lot_cost_basis, lot_purchase_date) in enumerate(purchase_lots):
+                for i, (
+                    lot_id,
+                    lot_shares,
+                    lot_cost_basis,
+                    lot_purchase_date,
+                ) in enumerate(purchase_lots):
                     if shares_remaining_to_sell <= 1e-8:
                         break
 
@@ -557,13 +681,23 @@ class SimulationEngine:
 
                     # Calculate holding period and tax
                     hold_days = (liquidation_date - lot_purchase_date).days
-                    tax_owed += self.calculate_tax(lot_cost, lot_sale_proceeds, hold_days)
+                    tax_owed += self.calculate_tax(
+                        lot_cost, lot_sale_proceeds, hold_days
+                    )
 
                     # Update lot
                     remaining_shares = lot_shares - shares_from_this_lot
                     if remaining_shares > 1e-8:
                         # Partial sale - keep remaining shares
-                        lots_to_update.append((i, lot_id, remaining_shares, lot_cost_basis, lot_purchase_date))
+                        lots_to_update.append(
+                            (
+                                i,
+                                lot_id,
+                                remaining_shares,
+                                lot_cost_basis,
+                                lot_purchase_date,
+                            )
+                        )
                     else:
                         # Full sale - mark for removal
                         lots_to_update.append((i, None, 0, 0, None))
@@ -572,16 +706,36 @@ class SimulationEngine:
 
                 # Apply updates to purchase_lots
                 new_lots = []
-                for i, (lot_id, lot_shares, lot_cost_basis, lot_purchase_date) in enumerate(purchase_lots):
+                for i, (
+                    lot_id,
+                    lot_shares,
+                    lot_cost_basis,
+                    lot_purchase_date,
+                ) in enumerate(purchase_lots):
                     updated = False
-                    for update_idx, update_lot_id, update_shares, update_cost, update_date in lots_to_update:
+                    for (
+                        update_idx,
+                        update_lot_id,
+                        update_shares,
+                        update_cost,
+                        update_date,
+                    ) in lots_to_update:
                         if i == update_idx:
                             if update_lot_id is not None:  # Keep remaining shares
-                                new_lots.append((update_lot_id, update_shares, update_cost, update_date))
+                                new_lots.append(
+                                    (
+                                        update_lot_id,
+                                        update_shares,
+                                        update_cost,
+                                        update_date,
+                                    )
+                                )
                             updated = True
                             break
                     if not updated:
-                        new_lots.append((lot_id, lot_shares, lot_cost_basis, lot_purchase_date))
+                        new_lots.append(
+                            (lot_id, lot_shares, lot_cost_basis, lot_purchase_date)
+                        )
 
                 purchase_lots = new_lots
                 shares_held -= shares_to_sell
@@ -589,20 +743,25 @@ class SimulationEngine:
                 total_taxes_paid += tax_owed
 
                 # Create descriptive note showing what was liquidated
-                income_descriptions = [f"${amt:.0f} from {dt.strftime('%m/%d')}" for dt, amt, _ in income_list[:3]]
+                income_descriptions = [
+                    f"${amt:.0f} from {dt.strftime('%m/%d')}"
+                    for dt, amt, _ in income_list[:3]
+                ]
                 if len(income_list) > 3:
                     income_descriptions.append(f"+ {len(income_list) - 3} more")
                 income_desc = ", ".join(income_descriptions)
 
-                events.append(SimulationEvent(
-                    date=liquidation_date,
-                    event_type='sell',
-                    shares=shares_to_sell,
-                    price_per_share=sell_price,
-                    amount=sale_proceeds,
-                    tax_owed=tax_owed,
-                    notes=f"Principal-only liquidation: ${total_principal_to_recover:.0f} from {len(income_list)} paycheck(s) ({income_desc})"
-                ))
+                events.append(
+                    SimulationEvent(
+                        date=liquidation_date,
+                        event_type="sell",
+                        shares=shares_to_sell,
+                        price_per_share=sell_price,
+                        amount=sale_proceeds,
+                        tax_owed=tax_owed,
+                        notes=f"Principal-only liquidation: ${total_principal_to_recover:.0f} from {len(income_list)} paycheck(s) ({income_desc})",
+                    )
+                )
 
         # Calculate final account value
         final_price = prices[end_date]
@@ -628,7 +787,8 @@ class SimulationEngine:
 
         # Get income sources
         income_sources = [
-            inc for inc in self.config.income
+            inc
+            for inc in self.config.income
             if inc.id in self.simulation.income_source_ids
         ]
 
@@ -646,8 +806,14 @@ class SimulationEngine:
 
                 # Apply income growth based on years elapsed
                 years_elapsed = (next_income - self.start_date).days / 365.0
-                growth_periods = int(years_elapsed / self.simulation.income_growth_frequency) if self.simulation.income_growth_frequency > 0 else 0
-                income_multiplier = (1 + self.simulation.income_growth_rate) ** growth_periods
+                growth_periods = (
+                    int(years_elapsed / self.simulation.income_growth_frequency)
+                    if self.simulation.income_growth_frequency > 0
+                    else 0
+                )
+                income_multiplier = (
+                    1 + self.simulation.income_growth_rate
+                ) ** growth_periods
                 adjusted_amount = income_source.amount * income_multiplier
 
                 day_offset = (next_income - self.start_date).days
@@ -655,7 +821,9 @@ class SimulationEngine:
                 current_date = next_income
 
         print(f"Running {self.simulation.num_simulations} simulations using Rust...")
-        print(f"  Simulating {years} years (age {self.simulation.current_age} → {target_age})")
+        print(
+            f"  Simulating {years} years (age {self.simulation.current_age} → {target_age})"
+        )
 
         start_time = time.time()
 
@@ -696,7 +864,9 @@ class SimulationEngine:
 
             elapsed = time.time() - start_time
             rate = len(runs) / elapsed
-            print(f"  ✓ Completed all {len(runs)} runs in {elapsed:.1f}s ({rate:.1f} runs/sec)!")
+            print(
+                f"  ✓ Completed all {len(runs)} runs in {elapsed:.1f}s ({rate:.1f} runs/sec)!"
+            )
 
         except KeyboardInterrupt:
             print(f"\n  ⚠️  Simulation interrupted!")
@@ -708,7 +878,9 @@ class SimulationEngine:
             target_age=target_age,
         )
 
-    def run_monte_carlo(self, target_age: int, force_python: bool = False) -> MonteCarloResults:
+    def run_monte_carlo(
+        self, target_age: int, force_python: bool = False
+    ) -> MonteCarloResults:
         """
         Run Monte Carlo simulation with multiple iterations.
 
@@ -728,7 +900,9 @@ class SimulationEngine:
             if self.simulation.num_simulations > 10:
                 use_rust = True
             else:
-                print(f"ℹ️  Using Python for detailed event tracking (num_simulations={self.simulation.num_simulations})")
+                print(
+                    f"ℹ️  Using Python for detailed event tracking (num_simulations={self.simulation.num_simulations})"
+                )
 
         if use_rust:
             return self.run_monte_carlo_rust(target_age)
@@ -738,28 +912,40 @@ class SimulationEngine:
 
         years = target_age - self.simulation.current_age
         print(f"Running {self.simulation.num_simulations} simulations (Python)...")
-        print(f"  Simulating {years} years (age {self.simulation.current_age} → {target_age})")
+        print(
+            f"  Simulating {years} years (age {self.simulation.current_age} → {target_age})"
+        )
         print(f"  This may take a few moments...")
 
         start_time = time.time()
         runs = []
 
         # More frequent updates for better feedback
-        update_interval = max(1, self.simulation.num_simulations // 20)  # 20 updates max
+        update_interval = max(
+            1, self.simulation.num_simulations // 20
+        )  # 20 updates max
 
         try:
             for i in range(self.simulation.num_simulations):
                 if (i + 1) % update_interval == 0 or i == 0:
                     elapsed = time.time() - start_time
                     rate = (i + 1) / elapsed if elapsed > 0 else 0
-                    remaining = (self.simulation.num_simulations - i - 1) / rate if rate > 0 else 0
-                    print(f"  [{i + 1:4d}/{self.simulation.num_simulations}] {rate:.1f} runs/sec, ~{remaining:.0f}s remaining")
+                    remaining = (
+                        (self.simulation.num_simulations - i - 1) / rate
+                        if rate > 0
+                        else 0
+                    )
+                    print(
+                        f"  [{i + 1:4d}/{self.simulation.num_simulations}] {rate:.1f} runs/sec, ~{remaining:.0f}s remaining"
+                    )
 
                 run_result = self.run_single_simulation(i, target_age)
                 runs.append(run_result)
 
             elapsed = time.time() - start_time
-            print(f"  ✓ Completed all {self.simulation.num_simulations} runs in {elapsed:.1f}s!")
+            print(
+                f"  ✓ Completed all {self.simulation.num_simulations} runs in {elapsed:.1f}s!"
+            )
 
         except KeyboardInterrupt:
             print(f"\n  ⚠️  Interrupted after {len(runs)} runs")

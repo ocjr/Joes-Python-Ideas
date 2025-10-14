@@ -31,7 +31,11 @@ def generate_instructions_run(config, simulation_config, months: int = 6):
 
     # Create a short-term version of the simulation (just for instructions)
     years_for_months = months / 12.0
-    instruction_age = simulation_config.current_age + int(years_for_months) + (1 if years_for_months % 1 > 0 else 0)
+    instruction_age = (
+        simulation_config.current_age
+        + int(years_for_months)
+        + (1 if years_for_months % 1 > 0 else 0)
+    )
 
     # Copy simulation config but with fixed seed and single run
     instruction_sim = InvestmentSimulation(
@@ -65,7 +69,9 @@ def generate_instructions_run(config, simulation_config, months: int = 6):
     return results.runs[0]
 
 
-def print_actionable_instructions(results: MonteCarloResults, max_instructions: int = 50, config=None):
+def print_actionable_instructions(
+    results: MonteCarloResults, max_instructions: int = 50, config=None
+):
     """
     Print actionable buy/sell instructions based on a representative run.
 
@@ -94,7 +100,9 @@ def print_actionable_instructions(results: MonteCarloResults, max_instructions: 
         print("   (Running 6-month Python simulation for transaction details)")
         print()
 
-        sample_run = generate_instructions_run(config, results.simulation_config, months=6)
+        sample_run = generate_instructions_run(
+            config, results.simulation_config, months=6
+        )
     else:
         sample_run = results.runs[0]
 
@@ -105,11 +113,15 @@ def print_actionable_instructions(results: MonteCarloResults, max_instructions: 
 
     print(f"Strategy: {results.simulation_config.strategy_type}")
     if results.simulation_config.strategy_type == "monthly_liquidation":
-        print(f"Liquidation schedule: Day {results.simulation_config.liquidation_day} of each month\n")
+        print(
+            f"Liquidation schedule: Day {results.simulation_config.liquidation_day} of each month\n"
+        )
 
     # Display income growth info if applicable
     if results.simulation_config.income_growth_rate > 0:
-        print(f"📈 Income Growth: {results.simulation_config.income_growth_rate*100:.1f}% every {results.simulation_config.income_growth_frequency} year(s)")
+        print(
+            f"📈 Income Growth: {results.simulation_config.income_growth_rate*100:.1f}% every {results.simulation_config.income_growth_frequency} year(s)"
+        )
         print(f"   Your income will increase over time in the simulation.\n")
 
     print("-" * 80)
@@ -126,7 +138,9 @@ def print_actionable_instructions(results: MonteCarloResults, max_instructions: 
                 print()
             current_year = event.date.year
             print(f"\n{'='*80}")
-            print(f"YEAR {current_year} (Age {results.simulation_config.current_age + (current_year - sample_run.events[0].date.year)})")
+            print(
+                f"YEAR {current_year} (Age {results.simulation_config.current_age + (current_year - sample_run.events[0].date.year)})"
+            )
             print(f"{'='*80}\n")
             current_month = None
 
@@ -139,24 +153,36 @@ def print_actionable_instructions(results: MonteCarloResults, max_instructions: 
             print("-" * 40)
 
         # Format instruction based on event type - simple and direct
-        day_str = event.date.strftime("%d").lstrip('0')  # Remove leading zero (e.g., "3" instead of "03")
+        day_str = event.date.strftime("%d").lstrip(
+            "0"
+        )  # Remove leading zero (e.g., "3" instead of "03")
         day_of_week = event.date.strftime("%a")  # Mon, Tue, etc.
 
-        if event.event_type == 'buy':
+        if event.event_type == "buy":
             if "Initial" in event.notes:
-                print(f"  {day_str} ({day_of_week}): Buy ${abs(event.amount):,.0f} worth of {ticker} (initial investment)")
+                print(
+                    f"  {day_str} ({day_of_week}): Buy ${abs(event.amount):,.0f} worth of {ticker} (initial investment)"
+                )
             else:
-                print(f"  {day_str} ({day_of_week}): Buy ${abs(event.amount):,.0f} worth of {ticker}")
+                print(
+                    f"  {day_str} ({day_of_week}): Buy ${abs(event.amount):,.0f} worth of {ticker}"
+                )
 
-        elif event.event_type == 'sell':
+        elif event.event_type == "sell":
             if event.tax_owed > 0:
-                print(f"  {day_str} ({day_of_week}): Sell ${event.amount:,.0f} worth of {ticker} (tax: ${event.tax_owed:.2f})")
+                print(
+                    f"  {day_str} ({day_of_week}): Sell ${event.amount:,.0f} worth of {ticker} (tax: ${event.tax_owed:.2f})"
+                )
             else:
-                print(f"  {day_str} ({day_of_week}): Sell ${event.amount:,.0f} worth of {ticker}")
+                print(
+                    f"  {day_str} ({day_of_week}): Sell ${event.amount:,.0f} worth of {ticker}"
+                )
 
-        elif event.event_type == 'dividend':
+        elif event.event_type == "dividend":
             net = event.amount - event.tax_owed
-            print(f"  {day_str} ({day_of_week}): Receive dividend ${net:.2f} (auto-reinvest)")
+            print(
+                f"  {day_str} ({day_of_week}): Receive dividend ${net:.2f} (auto-reinvest)"
+            )
 
     if len(sample_run.events) > max_instructions:
         remaining = len(sample_run.events) - max_instructions
@@ -166,13 +192,15 @@ def print_actionable_instructions(results: MonteCarloResults, max_instructions: 
     print("\n" + "=" * 80)
     print("NOTES")
     print("=" * 80)
-    print(f"""
+    print(
+        f"""
 • Set calendar reminders for each buy/sell date
 • Keep records of all transactions for taxes (you'll need basis tracking)
 • These are projections - actual prices will vary
 • Consider setting up automatic investments if your broker supports it
 
-""")
+"""
+    )
 
     print("=" * 80)
 
@@ -187,7 +215,9 @@ def print_simulation_summary(results: MonteCarloResults):
 
     # Check if this is a partial result (interrupted)
     if results.num_runs < results.simulation_config.num_simulations:
-        print(f"\n⚠️  PARTIAL RESULTS: {results.num_runs} of {results.simulation_config.num_simulations} runs completed")
+        print(
+            f"\n⚠️  PARTIAL RESULTS: {results.num_runs} of {results.simulation_config.num_simulations} runs completed"
+        )
         print(f"   Results may be less reliable with fewer simulations\n")
 
     print(f"\nConfiguration:")
@@ -198,9 +228,13 @@ def print_simulation_summary(results: MonteCarloResults):
         print(f"  Hold period: {results.simulation_config.hold_days} days")
     print(f"  Current age: {results.simulation_config.current_age}")
     print(f"  Target age: {results.target_age}")
-    print(f"  Years simulated: {results.target_age - results.simulation_config.current_age}")
+    print(
+        f"  Years simulated: {results.target_age - results.simulation_config.current_age}"
+    )
     print(f"  Number of runs: {results.num_runs}")
-    print(f"  Expected return: {results.simulation_config.expected_annual_return*100:.1f}%")
+    print(
+        f"  Expected return: {results.simulation_config.expected_annual_return*100:.1f}%"
+    )
     print(f"  Volatility: {results.simulation_config.annual_volatility*100:.1f}%")
 
     print(f"\n" + "-" * 80)
@@ -286,9 +320,9 @@ def print_sample_run(run: SingleRunResult, max_events: int = 20):
     print(f"  Net gain:            ${run.net_gain:,.2f}")
 
     # Count event types
-    buy_events = [e for e in run.events if e.event_type == 'buy']
-    sell_events = [e for e in run.events if e.event_type == 'sell']
-    dividend_events = [e for e in run.events if e.event_type == 'dividend']
+    buy_events = [e for e in run.events if e.event_type == "buy"]
+    sell_events = [e for e in run.events if e.event_type == "sell"]
+    dividend_events = [e for e in run.events if e.event_type == "dividend"]
 
     print(f"\nEvent Summary:")
     print(f"  Total events:    {len(run.events)}")
@@ -299,7 +333,9 @@ def print_sample_run(run: SingleRunResult, max_events: int = 20):
     if len(run.events) > 0:
         print(f"\nFirst {min(max_events, len(run.events))} Events:")
         for i, event in enumerate(run.events[:max_events]):
-            print(f"\n  {i+1}. {event.date.strftime('%Y-%m-%d')} - {event.event_type.upper()}")
+            print(
+                f"\n  {i+1}. {event.date.strftime('%Y-%m-%d')} - {event.event_type.upper()}"
+            )
             print(f"     Shares: {event.shares:.4f} @ ${event.price_per_share:.2f}")
             if event.amount < 0:
                 print(f"     Cost: ${abs(event.amount):,.2f}")
@@ -336,18 +372,45 @@ def compare_strategies(results_list: list[MonteCarloResults]):
         ("Target Age", lambda r: r.target_age),
         ("Num Runs", lambda r: r.num_runs),
         ("", lambda r: ""),  # Separator
-        ("Median Final Value", lambda r: f"${r.get_statistics()['final_value']['median']:,.2f}"),
-        ("Mean Final Value", lambda r: f"${r.get_statistics()['final_value']['mean']:,.2f}"),
-        ("90th Percentile Value", lambda r: f"${r.get_statistics()['final_value']['p90']:,.2f}"),
-        ("10th Percentile Value", lambda r: f"${r.get_statistics()['final_value']['p10']:,.2f}"),
+        (
+            "Median Final Value",
+            lambda r: f"${r.get_statistics()['final_value']['median']:,.2f}",
+        ),
+        (
+            "Mean Final Value",
+            lambda r: f"${r.get_statistics()['final_value']['mean']:,.2f}",
+        ),
+        (
+            "90th Percentile Value",
+            lambda r: f"${r.get_statistics()['final_value']['p90']:,.2f}",
+        ),
+        (
+            "10th Percentile Value",
+            lambda r: f"${r.get_statistics()['final_value']['p10']:,.2f}",
+        ),
         ("", lambda r: ""),  # Separator
-        ("Median Net Gain", lambda r: f"${r.get_statistics()['net_gain']['median']:,.2f}"),
+        (
+            "Median Net Gain",
+            lambda r: f"${r.get_statistics()['net_gain']['median']:,.2f}",
+        ),
         ("Mean Net Gain", lambda r: f"${r.get_statistics()['net_gain']['mean']:,.2f}"),
-        ("90th Percentile Gain", lambda r: f"${r.get_statistics()['net_gain']['p90']:,.2f}"),
-        ("10th Percentile Gain", lambda r: f"${r.get_statistics()['net_gain']['p10']:,.2f}"),
+        (
+            "90th Percentile Gain",
+            lambda r: f"${r.get_statistics()['net_gain']['p90']:,.2f}",
+        ),
+        (
+            "10th Percentile Gain",
+            lambda r: f"${r.get_statistics()['net_gain']['p10']:,.2f}",
+        ),
         ("", lambda r: ""),  # Separator
-        ("Prob. Positive Gain", lambda r: f"{(sum(1 for run in r.runs if run.net_gain > 0) / r.num_runs * 100):.1f}%"),
-        ("Avg Taxes Paid", lambda r: f"${r.get_statistics()['total_taxes']['mean']:,.2f}"),
+        (
+            "Prob. Positive Gain",
+            lambda r: f"{(sum(1 for run in r.runs if run.net_gain > 0) / r.num_runs * 100):.1f}%",
+        ),
+        (
+            "Avg Taxes Paid",
+            lambda r: f"${r.get_statistics()['total_taxes']['mean']:,.2f}",
+        ),
     ]
 
     for label, func in metrics:
@@ -367,27 +430,36 @@ def export_results_to_csv(results: MonteCarloResults, filename: str):
     """Export simulation results to CSV for further analysis."""
     import csv
 
-    with open(filename, 'w', newline='') as f:
+    with open(filename, "w", newline="") as f:
         writer = csv.writer(f)
 
         # Header
-        writer.writerow([
-            'run_number', 'final_age', 'final_account_value',
-            'total_invested', 'total_withdrawn', 'total_taxes_paid',
-            'total_dividends', 'net_gain'
-        ])
+        writer.writerow(
+            [
+                "run_number",
+                "final_age",
+                "final_account_value",
+                "total_invested",
+                "total_withdrawn",
+                "total_taxes_paid",
+                "total_dividends",
+                "net_gain",
+            ]
+        )
 
         # Data rows
         for run in results.runs:
-            writer.writerow([
-                run.run_number,
-                run.final_age,
-                run.final_account_value,
-                run.total_invested,
-                run.total_withdrawn,
-                run.total_taxes_paid,
-                run.total_dividends,
-                run.net_gain,
-            ])
+            writer.writerow(
+                [
+                    run.run_number,
+                    run.final_age,
+                    run.final_account_value,
+                    run.total_invested,
+                    run.total_withdrawn,
+                    run.total_taxes_paid,
+                    run.total_dividends,
+                    run.net_gain,
+                ]
+            )
 
     print(f"✅ Exported {len(results.runs)} simulation runs to {filename}")

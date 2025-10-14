@@ -5,6 +5,7 @@ Test income growth and actionable instructions features.
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date
@@ -80,6 +81,7 @@ def test_income_growth():
 
     # Disable Rust for this test to get detailed events
     import simulation_engine
+
     original_rust = simulation_engine.RUST_AVAILABLE
     simulation_engine.RUST_AVAILABLE = False
 
@@ -100,7 +102,11 @@ def test_income_growth():
         print()
 
         # Check events from first run
-        buy_events = [e for e in results.runs[0].events if e.event_type == 'buy' and 'paycheck' in e.notes.lower()]
+        buy_events = [
+            e
+            for e in results.runs[0].events
+            if e.event_type == "buy" and "paycheck" in e.notes.lower()
+        ]
         if buy_events:
             print(f"Found {len(buy_events)} income investment events")
             print("\nSample income amounts over time:")

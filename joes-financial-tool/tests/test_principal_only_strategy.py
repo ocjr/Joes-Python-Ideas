@@ -8,6 +8,7 @@ while letting gains compound.
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date
@@ -56,7 +57,9 @@ def run_comparison():
     )
 
     print("📊 SCENARIO:")
-    print(f"   Income: ${config.income[0].amount:,.2f} every 2 weeks (26 paychecks/year)")
+    print(
+        f"   Income: ${config.income[0].amount:,.2f} every 2 weeks (26 paychecks/year)"
+    )
     print(f"   Initial balance: $5,000")
     print(f"   Simulation period: 2 years (age 38 → 40)")
     print(f"   Liquidation day: 1st of each month")
@@ -64,6 +67,7 @@ def run_comparison():
 
     # Disable Rust for detailed events
     import simulation_engine
+
     original_rust = simulation_engine.RUST_AVAILABLE
     simulation_engine.RUST_AVAILABLE = False
 
@@ -172,21 +176,33 @@ def run_comparison():
         print()
 
         tax_savings = run_monthly.total_taxes_paid - run_principal.total_taxes_paid
-        tax_savings_pct = (tax_savings / run_monthly.total_taxes_paid) * 100 if run_monthly.total_taxes_paid > 0 else 0
+        tax_savings_pct = (
+            (tax_savings / run_monthly.total_taxes_paid) * 100
+            if run_monthly.total_taxes_paid > 0
+            else 0
+        )
 
-        final_value_increase = run_principal.final_account_value - run_monthly.final_account_value
+        final_value_increase = (
+            run_principal.final_account_value - run_monthly.final_account_value
+        )
         net_gain_increase = run_principal.net_gain - run_monthly.net_gain
 
         print(f"💰 TAX SAVINGS:")
         print(f"   Monthly liquidation taxes: ${run_monthly.total_taxes_paid:,.2f}")
         print(f"   Principal-only taxes:      ${run_principal.total_taxes_paid:,.2f}")
         print(f"   {'─' * 50}")
-        print(f"   TAX SAVINGS:               ${tax_savings:,.2f} ({tax_savings_pct:.1f}% reduction)")
+        print(
+            f"   TAX SAVINGS:               ${tax_savings:,.2f} ({tax_savings_pct:.1f}% reduction)"
+        )
         print()
 
         print(f"📈 WEALTH ACCUMULATION:")
-        print(f"   Monthly liquidation final value: ${run_monthly.final_account_value:,.2f}")
-        print(f"   Principal-only final value:      ${run_principal.final_account_value:,.2f}")
+        print(
+            f"   Monthly liquidation final value: ${run_monthly.final_account_value:,.2f}"
+        )
+        print(
+            f"   Principal-only final value:      ${run_principal.final_account_value:,.2f}"
+        )
         print(f"   {'─' * 50}")
         print(f"   ADDITIONAL WEALTH:               ${final_value_increase:,.2f}")
         print()
@@ -195,7 +211,9 @@ def run_comparison():
         print(f"   Monthly liquidation net gain: ${run_monthly.net_gain:,.2f}")
         print(f"   Principal-only net gain:      ${run_principal.net_gain:,.2f}")
         print(f"   {'─' * 50}")
-        print(f"   IMPROVEMENT:                  ${net_gain_increase:,.2f} ({(net_gain_increase/run_monthly.net_gain)*100:.1f}% better)")
+        print(
+            f"   IMPROVEMENT:                  ${net_gain_increase:,.2f} ({(net_gain_increase/run_monthly.net_gain)*100:.1f}% better)"
+        )
         print()
 
         # ROI comparison
@@ -205,7 +223,9 @@ def run_comparison():
         print(f"📊 RETURN ON INVESTMENT:")
         print(f"   Monthly liquidation ROI: {roi_monthly:.2f}%")
         print(f"   Principal-only ROI:      {roi_principal:.2f}%")
-        print(f"   Improvement:             {roi_principal - roi_monthly:.2f} percentage points")
+        print(
+            f"   Improvement:             {roi_principal - roi_monthly:.2f} percentage points"
+        )
         print()
 
         print("=" * 80)
@@ -215,11 +235,13 @@ def run_comparison():
         print("1. 📉 LOWER TAX DRAG:")
         print("   • You only pay taxes on gains when you sell principal")
         print("   • Most gains stay invested and untaxed")
-        print("   • Accumulated gains may eventually qualify for long-term rates (15% vs 22%)")
+        print(
+            "   • Accumulated gains may eventually qualify for long-term rates (15% vs 22%)"
+        )
         print()
         print("2. 📈 BETTER COMPOUNDING:")
         print("   • Gains stay in the market and generate returns")
-        print("   • You're investing \"free money\" (market gains)")
+        print('   • You\'re investing "free money" (market gains)')
         print("   • The longer you run this, the bigger the advantage")
         print()
         print("3. 💵 SAME LIQUIDITY:")
@@ -228,9 +250,13 @@ def run_comparison():
         print("   • But you're building wealth on the side")
         print()
         print("4. 🎯 PERFECT FOR YOUR USE CASE:")
-        print("   • You said: 'I am investing money I wouldn't have been able to invest'")
+        print(
+            "   • You said: 'I am investing money I wouldn't have been able to invest'"
+        )
         print("   • Principal-only lets you use money for expenses AND build wealth")
-        print(f"   • After 2 years, you have ${final_value_increase:,.0f} more invested!")
+        print(
+            f"   • After 2 years, you have ${final_value_increase:,.0f} more invested!"
+        )
         print()
 
         # Show some sample events
@@ -240,7 +266,9 @@ def run_comparison():
         print()
         print("PRINCIPAL-ONLY STRATEGY:")
         for i, event in enumerate(run_principal.events[:10], 1):
-            print(f"{i}. {event.date.strftime('%Y-%m-%d')} - {event.event_type.upper()}")
+            print(
+                f"{i}. {event.date.strftime('%Y-%m-%d')} - {event.event_type.upper()}"
+            )
             print(f"   Amount: ${abs(event.amount):,.2f}")
             if event.tax_owed > 0:
                 print(f"   Tax: ${event.tax_owed:.2f}")

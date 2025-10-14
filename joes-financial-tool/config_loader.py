@@ -102,7 +102,8 @@ def load_config(config_path: Union[str, Path]) -> FinancialConfig:
 
         # Parse investment accounts
         investment_accounts = [
-            InvestmentAccount(**inv_acc) for inv_acc in data.get("investment_accounts", [])
+            InvestmentAccount(**inv_acc)
+            for inv_acc in data.get("investment_accounts", [])
         ]
 
         # Parse simulations
@@ -265,7 +266,11 @@ def save_config(config: FinancialConfig, config_path: Union[str, Path]) -> None:
                         "price_per_share": txn.price_per_share,
                         "total_amount": txn.total_amount,
                         "commission": txn.commission,
-                        "settlement_date": txn.settlement_date.isoformat() if txn.settlement_date else None,
+                        "settlement_date": (
+                            txn.settlement_date.isoformat()
+                            if txn.settlement_date
+                            else None
+                        ),
                         "notes": txn.notes,
                     }
                     for txn in inv_acc.transactions

@@ -85,7 +85,9 @@ def add_manual_position(config_path: str = "financial_config.json"):
         return False
 
     if not config.investment_accounts:
-        print("❌ No investment accounts found. Please add an investment account first.\n")
+        print(
+            "❌ No investment accounts found. Please add an investment account first.\n"
+        )
         return False
 
     print_header("Add Manual Position")
@@ -109,12 +111,16 @@ def add_manual_position(config_path: str = "financial_config.json"):
     if existing and existing.shares > 0:
         print(f"\n⚠️  You already have {existing.shares:.4f} shares of {symbol}")
         print(f"   Current cost basis: ${existing.cost_basis:,.2f}")
-        if not get_input("Add to existing position? (y/n)", default="n", input_type=bool):
+        if not get_input(
+            "Add to existing position? (y/n)", default="n", input_type=bool
+        ):
             return False
 
     # Position details
     shares = get_input("Number of shares", input_type=float)
-    cost_per_share = get_input("Cost basis per share (original purchase price)", input_type=float)
+    cost_per_share = get_input(
+        "Cost basis per share (original purchase price)", input_type=float
+    )
 
     # Calculate total cost basis
     total_cost_basis = shares * cost_per_share
@@ -157,8 +163,11 @@ def add_manual_position(config_path: str = "financial_config.json"):
         print(f"✓ Cost basis: ${total_cost_basis:,.2f}")
 
     # Optionally create a placeholder transaction for record-keeping
-    if get_input("\nCreate placeholder transaction record? (y/n)", default="y", input_type=bool):
+    if get_input(
+        "\nCreate placeholder transaction record? (y/n)", default="y", input_type=bool
+    ):
         from datetime import date
+
         placeholder_date = date(1900, 1, 1)  # Placeholder date for manual entries
 
         txn_id = f"{symbol}_manual_{date.today().isoformat()}"
@@ -190,7 +199,9 @@ def add_manual_position(config_path: str = "financial_config.json"):
         if holding.current_price > 0:
             print(f"   Current price: ${holding.current_price:.2f}")
             print(f"   Market value: ${holding.market_value:,.2f}")
-            print(f"   Unrealized gain/loss: ${holding.gain_loss:+,.2f} ({holding.gain_loss_pct:+.2f}%)")
+            print(
+                f"   Unrealized gain/loss: ${holding.gain_loss:+,.2f} ({holding.gain_loss_pct:+.2f}%)"
+            )
         else:
             print(f"   Current price: Not set (use option 23 to refresh)")
         print()
@@ -210,7 +221,9 @@ def record_stock_transaction(config_path: str = "financial_config.json"):
         return False
 
     if not config.investment_accounts:
-        print("❌ No investment accounts found. Please add an investment account first.\n")
+        print(
+            "❌ No investment accounts found. Please add an investment account first.\n"
+        )
         return False
 
     print_header("Record Stock Transaction")
@@ -255,7 +268,9 @@ def record_stock_transaction(config_path: str = "financial_config.json"):
     else:
         # Buy or sell
         shares = get_input("Number of shares", input_type=float)
-        price_per_share = get_input("Price per share (execution price)", input_type=float)
+        price_per_share = get_input(
+            "Price per share (execution price)", input_type=float
+        )
 
         # Calculate subtotal
         subtotal = shares * price_per_share
@@ -271,13 +286,25 @@ def record_stock_transaction(config_path: str = "financial_config.json"):
             if use_default:
                 commission = default_comm
             else:
-                commission = get_input(
-                    "Custom commission for this trade", default=0.0, input_type=float, required=False
-                ) or 0.0
+                commission = (
+                    get_input(
+                        "Custom commission for this trade",
+                        default=0.0,
+                        input_type=float,
+                        required=False,
+                    )
+                    or 0.0
+                )
         else:
-            commission = get_input(
-                "Commission/fees (if any)", default=0.0, input_type=float, required=False
-            ) or 0.0
+            commission = (
+                get_input(
+                    "Commission/fees (if any)",
+                    default=0.0,
+                    input_type=float,
+                    required=False,
+                )
+                or 0.0
+            )
 
         if commission > 0:
             print(f"Commission: ${commission:.2f}")
@@ -326,13 +353,15 @@ def record_stock_transaction(config_path: str = "financial_config.json"):
 
     auto_settlement = temp_transaction.settlement_date
     if auto_settlement:
-        print(f"Auto-calculated settlement: {auto_settlement.strftime('%Y-%m-%d (%A)')}")
+        print(
+            f"Auto-calculated settlement: {auto_settlement.strftime('%Y-%m-%d (%A)')}"
+        )
         custom_settlement = get_input(
             "Use different settlement date? (leave blank for auto)", required=False
         )
         if custom_settlement:
             try:
-                year, month, day = custom_settlement.split('-')
+                year, month, day = custom_settlement.split("-")
                 settlement_date = date(int(year), int(month), int(day))
             except:
                 print("Invalid date format, using auto-calculated settlement date")
@@ -363,7 +392,9 @@ def record_stock_transaction(config_path: str = "financial_config.json"):
     # Save config
     save_config(config, config_path)
 
-    print(f"\n✓ Recorded {txn_type}: {shares} shares of {symbol} @ ${price_per_share:.2f}")
+    print(
+        f"\n✓ Recorded {txn_type}: {shares} shares of {symbol} @ ${price_per_share:.2f}"
+    )
     if commission > 0:
         print(f"  Commission: ${commission:.2f}")
     if settlement_date:
@@ -401,9 +432,7 @@ def refresh_stock_prices(config_path: str = "financial_config.json"):
     print("Update current market prices for your holdings.\n")
 
     # Check if there are any holdings
-    total_holdings = sum(
-        len(acc.holdings) for acc in config.investment_accounts
-    )
+    total_holdings = sum(len(acc.holdings) for acc in config.investment_accounts)
 
     if total_holdings == 0:
         print("📊 No stock holdings found. Record some transactions first!\n")
@@ -469,11 +498,15 @@ def view_investment_portfolio(config_path: str = "financial_config.json"):
         print(f"💵 Cash Balance: ${inv_acc.cash_balance:,.2f}\n")
 
         if inv_acc.holdings:
-            print(f"{'Symbol':<10} {'Shares':>12} {'Avg Cost':>12} {'Current':>12} {'Value':>14} {'Unrealized G/L':>16}")
+            print(
+                f"{'Symbol':<10} {'Shares':>12} {'Avg Cost':>12} {'Current':>12} {'Value':>14} {'Unrealized G/L':>16}"
+            )
             print("─" * 78)
 
             for holding in inv_acc.holdings:
-                avg_cost = holding.cost_basis / holding.shares if holding.shares > 0 else 0
+                avg_cost = (
+                    holding.cost_basis / holding.shares if holding.shares > 0 else 0
+                )
                 gain_loss_str = f"${holding.gain_loss:+,.2f}"
                 if holding.current_price > 0:
                     gain_loss_str += f" ({holding.gain_loss_pct:+.2f}%)"
@@ -497,7 +530,9 @@ def view_investment_portfolio(config_path: str = "financial_config.json"):
             total_market_value += inv_acc.total_market_value
             total_cost_basis += inv_acc.total_cost_basis
         else:
-            print("📊 No stock holdings yet. Record some transactions to get started!\n")
+            print(
+                "📊 No stock holdings yet. Record some transactions to get started!\n"
+            )
 
     # Grand total across all accounts
     if len(config.investment_accounts) > 1:

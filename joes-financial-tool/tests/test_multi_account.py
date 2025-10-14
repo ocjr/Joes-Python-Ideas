@@ -2,6 +2,7 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 """Test that the simulator intelligently selects between multiple checking accounts."""
 
@@ -30,14 +31,20 @@ secondary_checking = Account(
 config.accounts.append(secondary_checking)
 
 print("Account Setup:")
-print(f"  Main Checking: ${config.accounts[0].balance:.2f} (min ${config.accounts[0].minimum_balance:.2f}) = ${config.accounts[0].balance - config.accounts[0].minimum_balance:.2f} available")
-print(f"  Secondary Checking: ${secondary_checking.balance:.2f} (min ${secondary_checking.minimum_balance:.2f}) = ${secondary_checking.balance - secondary_checking.minimum_balance:.2f} available")
+print(
+    f"  Main Checking: ${config.accounts[0].balance:.2f} (min ${config.accounts[0].minimum_balance:.2f}) = ${config.accounts[0].balance - config.accounts[0].minimum_balance:.2f} available"
+)
+print(
+    f"  Secondary Checking: ${secondary_checking.balance:.2f} (min ${secondary_checking.minimum_balance:.2f}) = ${secondary_checking.balance - secondary_checking.minimum_balance:.2f} available"
+)
 
 optimizer = FinancialOptimizer(config)
 simulator = FinancialSimulator(config, optimizer.today)
 
 print("\nRunning simulation...")
-print("Expected: Should use Secondary Checking for large payments since Main only has $50 available")
+print(
+    "Expected: Should use Secondary Checking for large payments since Main only has $50 available"
+)
 
 result = simulator.run_simulation(OptimizationStrategy.AGGRESSIVE_DEBT, days_ahead=30)
 
@@ -61,22 +68,36 @@ else:
     secondary_change = secondary_final - secondary_checking.balance
 
     print(f"\n  Account Changes:")
-    print(f"    Main Checking: ${config.accounts[0].balance:.2f} → ${main_final:.2f} (change: ${main_change:+.2f})")
-    print(f"    Secondary Checking: ${secondary_checking.balance:.2f} → ${secondary_final:.2f} (change: ${secondary_change:+.2f})")
+    print(
+        f"    Main Checking: ${config.accounts[0].balance:.2f} → ${main_final:.2f} (change: ${main_change:+.2f})"
+    )
+    print(
+        f"    Secondary Checking: ${secondary_checking.balance:.2f} → ${secondary_final:.2f} (change: ${secondary_change:+.2f})"
+    )
 
     # Both accounts should stay above minimums
     if main_final >= config.accounts[0].minimum_balance:
-        print(f"    ✓ Main Checking stayed above minimum (${main_final:.2f} >= ${config.accounts[0].minimum_balance:.2f})")
+        print(
+            f"    ✓ Main Checking stayed above minimum (${main_final:.2f} >= ${config.accounts[0].minimum_balance:.2f})"
+        )
     else:
-        print(f"    ✗ Main Checking went below minimum! (${main_final:.2f} < ${config.accounts[0].minimum_balance:.2f})")
+        print(
+            f"    ✗ Main Checking went below minimum! (${main_final:.2f} < ${config.accounts[0].minimum_balance:.2f})"
+        )
 
     if secondary_final >= secondary_checking.minimum_balance:
-        print(f"    ✓ Secondary Checking stayed above minimum (${secondary_final:.2f} >= ${secondary_checking.minimum_balance:.2f})")
+        print(
+            f"    ✓ Secondary Checking stayed above minimum (${secondary_final:.2f} >= ${secondary_checking.minimum_balance:.2f})"
+        )
     else:
-        print(f"    ✗ Secondary Checking went below minimum! (${secondary_final:.2f} < ${secondary_checking.minimum_balance:.2f})")
+        print(
+            f"    ✗ Secondary Checking went below minimum! (${secondary_final:.2f} < ${secondary_checking.minimum_balance:.2f})"
+        )
 
     # The secondary account should have been used more (since main has limited availability)
     if abs(secondary_change) > abs(main_change):
-        print(f"\n    ✓ Correctly used Secondary Checking more (higher available balance)")
+        print(
+            f"\n    ✓ Correctly used Secondary Checking more (higher available balance)"
+        )
     else:
         print(f"\n    ℹ️  Main Checking used more than Secondary")

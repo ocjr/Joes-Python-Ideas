@@ -2,6 +2,7 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 """Test that simulator makes preemptive payments when bills would exceed CC limits."""
 
@@ -39,7 +40,9 @@ large_bill = Bill(
 config.bills.append(large_bill)
 
 print(f"\n  Large bill: ${large_bill.amount:.2f} on day 12 (charged to Visa)")
-print(f"  If charged without adjustment: ${visa_card.balance + large_bill.amount:.2f} (over limit by ${visa_card.balance + large_bill.amount - visa_card.credit_limit:.2f})")
+print(
+    f"  If charged without adjustment: ${visa_card.balance + large_bill.amount:.2f} (over limit by ${visa_card.balance + large_bill.amount - visa_card.credit_limit:.2f})"
+)
 
 optimizer = FinancialOptimizer(config)
 simulator = FinancialSimulator(config, optimizer.today)
@@ -75,7 +78,9 @@ else:
                 print(f"      ✓ PREEMPTIVE PAYMENT MADE!")
 
     if has_preemptive:
-        print(f"\n    ✓ Simulator correctly made preemptive payment to avoid exceeding limit")
+        print(
+            f"\n    ✓ Simulator correctly made preemptive payment to avoid exceeding limit"
+        )
     else:
         print(f"\n    ℹ️  No preemptive payment detected")
 
@@ -84,6 +89,10 @@ else:
     print(f"\n  Visa balance after transactions: ${final_visa:.2f}")
 
     if final_visa <= visa_card.credit_limit:
-        print(f"  ✓ Stayed within limit (${final_visa:.2f} <= ${visa_card.credit_limit:.2f})")
+        print(
+            f"  ✓ Stayed within limit (${final_visa:.2f} <= ${visa_card.credit_limit:.2f})"
+        )
     else:
-        print(f"  ✗ Exceeded limit! (${final_visa:.2f} > ${visa_card.credit_limit:.2f})")
+        print(
+            f"  ✗ Exceeded limit! (${final_visa:.2f} > ${visa_card.credit_limit:.2f})"
+        )

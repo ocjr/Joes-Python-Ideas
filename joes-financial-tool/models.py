@@ -57,14 +57,18 @@ class StockTransaction:
     price_per_share: float  # Price per share at transaction time
     total_amount: float  # Total transaction amount (shares * price + commission)
     commission: float = 0.0  # Commission/fees for this transaction
-    settlement_date: Optional[date] = None  # Settlement date (when cash/shares transfer)
+    settlement_date: Optional[date] = (
+        None  # Settlement date (when cash/shares transfer)
+    )
     notes: Optional[str] = None
 
     def __post_init__(self):
         if isinstance(self.date, str):
             self.date = datetime.strptime(self.date, "%Y-%m-%d").date()
         if self.settlement_date and isinstance(self.settlement_date, str):
-            self.settlement_date = datetime.strptime(self.settlement_date, "%Y-%m-%d").date()
+            self.settlement_date = datetime.strptime(
+                self.settlement_date, "%Y-%m-%d"
+            ).date()
 
         # Auto-calculate settlement date if not provided (T+1 for US stocks)
         if not self.settlement_date and self.transaction_type in ["buy", "sell"]:
@@ -157,7 +161,9 @@ class InvestmentAccount:
 
     def get_holding(self, symbol: str) -> Optional[StockHolding]:
         """Get holding for a specific stock symbol."""
-        return next((h for h in self.holdings if h.symbol.upper() == symbol.upper()), None)
+        return next(
+            (h for h in self.holdings if h.symbol.upper() == symbol.upper()), None
+        )
 
     def update_holdings_from_transactions(self):
         """Recalculate holdings based on transaction history."""
@@ -168,7 +174,11 @@ class InvestmentAccount:
             symbol = txn.symbol.upper()
 
             if symbol not in holdings_dict:
-                holdings_dict[symbol] = {"shares": 0.0, "cost_basis": 0.0, "current_price": 0.0}
+                holdings_dict[symbol] = {
+                    "shares": 0.0,
+                    "cost_basis": 0.0,
+                    "current_price": 0.0,
+                }
 
             if txn.transaction_type == "buy":
                 holdings_dict[symbol]["shares"] += txn.shares
@@ -176,7 +186,10 @@ class InvestmentAccount:
             elif txn.transaction_type == "sell":
                 # Calculate average cost per share before sale
                 if holdings_dict[symbol]["shares"] > 0:
-                    avg_cost = holdings_dict[symbol]["cost_basis"] / holdings_dict[symbol]["shares"]
+                    avg_cost = (
+                        holdings_dict[symbol]["cost_basis"]
+                        / holdings_dict[symbol]["shares"]
+                    )
                     holdings_dict[symbol]["cost_basis"] -= avg_cost * txn.shares
                 holdings_dict[symbol]["shares"] -= txn.shares
 
@@ -395,16 +408,22 @@ class InvestmentSimulation:
     target_ages: list[int] = None  # Ages to report (e.g., [65, 80])
 
     # Strategy parameters
-    strategy_type: Literal["constant_hold", "monthly_liquidation", "principal_only"] = "monthly_liquidation"
+    strategy_type: Literal["constant_hold", "monthly_liquidation", "principal_only"] = (
+        "monthly_liquidation"
+    )
     hold_days: int = 14  # For constant_hold strategy
-    liquidation_day: int = 1  # For monthly_liquidation and principal_only (day of month to sell)
+    liquidation_day: int = (
+        1  # For monthly_liquidation and principal_only (day of month to sell)
+    )
 
     # Income sources to include
     income_source_ids: list[str] = None  # List of income IDs to use in simulation
 
     # Income growth parameters
     income_growth_rate: float = 0.0  # Annual growth rate (e.g., 0.10 for 10%)
-    income_growth_frequency: int = 1  # Apply growth every N years (e.g., 2 for biennial)
+    income_growth_frequency: int = (
+        1  # Apply growth every N years (e.g., 2 for biennial)
+    )
 
     # Investment parameters
     ticker: str = "SPY"
@@ -459,7 +478,9 @@ class FinancialConfig:
 
         # Convert investment accounts from dicts if needed
         if self.investment_accounts and isinstance(self.investment_accounts[0], dict):
-            self.investment_accounts = [InvestmentAccount(**acc) for acc in self.investment_accounts]
+            self.investment_accounts = [
+                InvestmentAccount(**acc) for acc in self.investment_accounts
+            ]
 
         # Convert simulations from dicts if needed
         if self.simulations and isinstance(self.simulations[0], dict):

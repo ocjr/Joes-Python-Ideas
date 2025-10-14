@@ -5,6 +5,7 @@ Performance comparison: Rust vs Python simulation engines.
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date
@@ -94,6 +95,7 @@ def test_rust_vs_python():
         # Run with Python (temporarily disable Rust)
         print("\n🐍 PYTHON:")
         import simulation_engine
+
         simulation_engine.RUST_AVAILABLE = False
         results_python = engine.run_monte_carlo(target_age)
         simulation_engine.RUST_AVAILABLE = True
@@ -101,12 +103,16 @@ def test_rust_vs_python():
 
         # Compare results
         print("\n📊 Comparison:")
-        print(f"  Rust median final value:   ${results_rust.get_statistics()['final_value']['median']:,.2f}")
-        print(f"  Python median final value: ${results_python.get_statistics()['final_value']['median']:,.2f}")
+        print(
+            f"  Rust median final value:   ${results_rust.get_statistics()['final_value']['median']:,.2f}"
+        )
+        print(
+            f"  Python median final value: ${results_python.get_statistics()['final_value']['median']:,.2f}"
+        )
 
         # Results should be similar (within 10% due to randomness)
-        rust_median = results_rust.get_statistics()['final_value']['median']
-        python_median = results_python.get_statistics()['final_value']['median']
+        rust_median = results_rust.get_statistics()["final_value"]["median"]
+        python_median = results_python.get_statistics()["final_value"]["median"]
         diff_pct = abs(rust_median - python_median) / python_median * 100
 
         if diff_pct < 10:

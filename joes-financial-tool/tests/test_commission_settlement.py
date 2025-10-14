@@ -5,6 +5,7 @@ Test script for commission and settlement date features.
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date, timedelta
@@ -121,8 +122,12 @@ def test_commission_tracking():
     print(f"\n📊 Cost Basis Verification:")
     aapl_holding = legacy_acc.get_holding("AAPL")
     if aapl_holding:
-        print(f"  AAPL: 10 shares @ $150 + $6.95 commission = ${aapl_holding.cost_basis:.2f} total")
-        print(f"  Cost basis per share: ${aapl_holding.cost_basis / aapl_holding.shares:.2f}")
+        print(
+            f"  AAPL: 10 shares @ $150 + $6.95 commission = ${aapl_holding.cost_basis:.2f} total"
+        )
+        print(
+            f"  Cost basis per share: ${aapl_holding.cost_basis / aapl_holding.shares:.2f}"
+        )
 
     return config
 
@@ -133,14 +138,16 @@ def test_settlement_dates():
 
     # Test cases for settlement dates
     test_cases = [
-        (date(2025, 10, 13), "Monday"),     # Monday → Tuesday
-        (date(2025, 10, 14), "Tuesday"),    # Tuesday → Wednesday
-        (date(2025, 10, 17), "Friday"),     # Friday → Monday (skip weekend)
-        (date(2025, 10, 18), "Saturday"),   # Saturday → Monday
-        (date(2025, 10, 19), "Sunday"),     # Sunday → Monday
+        (date(2025, 10, 13), "Monday"),  # Monday → Tuesday
+        (date(2025, 10, 14), "Tuesday"),  # Tuesday → Wednesday
+        (date(2025, 10, 17), "Friday"),  # Friday → Monday (skip weekend)
+        (date(2025, 10, 18), "Saturday"),  # Saturday → Monday
+        (date(2025, 10, 19), "Sunday"),  # Sunday → Monday
     ]
 
-    print(f"{'Trade Date':<20} {'Day':<12} {'Settlement Date':<20} {'Day':<12} {'T+':<5}")
+    print(
+        f"{'Trade Date':<20} {'Day':<12} {'Settlement Date':<20} {'Day':<12} {'T+':<5}"
+    )
     print("=" * 70)
 
     for trade_date, day_name in test_cases:
@@ -177,7 +184,9 @@ def test_settlement_dates():
         shares=1.0,
         price_per_share=100.00,
         total_amount=100.00,
-        settlement_date=date(2025, 10, 16),  # Manually set to Thursday instead of Tuesday
+        settlement_date=date(
+            2025, 10, 16
+        ),  # Manually set to Thursday instead of Tuesday
     )
     print(f"  Trade date: {custom_txn.date} (Monday)")
     print(f"  Auto-calculated: {date(2025, 10, 14)} (Tuesday)")
@@ -248,7 +257,9 @@ def test_config_save_load():
     assert txn.commission == 4.95, "Transaction commission not loaded correctly"
     print(f"✓ Transaction commission: ${txn.commission:.2f}")
 
-    assert txn.settlement_date == date(2025, 10, 14), "Settlement date not loaded correctly"
+    assert txn.settlement_date == date(
+        2025, 10, 14
+    ), "Settlement date not loaded correctly"
     print(f"✓ Settlement date: {txn.settlement_date}")
 
     print("\n✅ All fields saved and loaded correctly!")

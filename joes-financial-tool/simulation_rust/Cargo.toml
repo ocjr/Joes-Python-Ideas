@@ -9,8 +9,8 @@ name = "simulation_rust"
 crate-type = ["cdylib"]
 
 [dependencies]
-# PyO3 for Python bindings
-pyo3 = { version = "0.20", features = ["extension-module"] }
+# PyO3 for Python bindings with abi3 for compatibility
+pyo3 = { version = "0.20", features = ["extension-module", "abi3-py310"] }
 
 # Fast random number generation
 rand = "0.8"

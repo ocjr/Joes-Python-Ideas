@@ -1,4 +1,5 @@
 """Test suite for Joe's Financial Tool."""
+
 import sys
 import os
 

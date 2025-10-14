@@ -5,6 +5,7 @@ Demonstrate event tracking in Python implementation.
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import date
@@ -95,8 +96,14 @@ print(f"📋 DETAILED EVENTS (showing first 20 of {len(run.events)}):")
 print("-" * 80)
 
 for i, event in enumerate(run.events[:20], 1):
-    symbol = "📥" if event.event_type == "buy" else "📤" if event.event_type == "sell" else "💰"
-    print(f"{i:2d}. {event.date.strftime('%Y-%m-%d')} {symbol} {event.event_type.upper()}")
+    symbol = (
+        "📥"
+        if event.event_type == "buy"
+        else "📤" if event.event_type == "sell" else "💰"
+    )
+    print(
+        f"{i:2d}. {event.date.strftime('%Y-%m-%d')} {symbol} {event.event_type.upper()}"
+    )
     print(f"    {event.notes}")
     print(f"    Shares: {event.shares:.2f} @ ${event.price_per_share:.2f}")
     if event.event_type == "sell":
