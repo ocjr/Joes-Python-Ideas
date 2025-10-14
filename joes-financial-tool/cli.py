@@ -18,10 +18,21 @@ from setup_wizard import (
     add_credit_card_to_config,
     add_manual_payment_to_config,
     add_recurring_expense_to_config,
+    add_investment_account_to_config,
 )
 from edit_wizard import edit_account, edit_income, edit_bill, edit_credit_card
 from bill_tracker import mark_bill_paid
 from financial_advisor import interactive_advice
+from investment_manager import (
+    add_manual_position,
+    record_stock_transaction,
+    refresh_stock_prices,
+    view_investment_portfolio,
+)
+from simulation_engine import SimulationEngine
+from simulation_reports import print_simulation_summary, print_sample_run, print_actionable_instructions
+from simulation_wizard import add_simulation_to_config, edit_simulation
+from etf_library import view_etf_library, add_etf_interactive, search_etf_interactive
 from config_manager import (
     get_dated_config_name,
     select_config_interactive,
@@ -152,9 +163,27 @@ def print_menu(current_config: str = "financial_config.json"):
     print("   18. ✏️  Edit Bill")
     print("   19. ✏️  Edit Credit Card")
     print()
+    print("  INVESTMENTS:")
+    print("   20. 📈 View Investment Portfolio")
+    print("   21. ➕ Add Investment Account")
+    print("   22. 📊 Add Stock Position (no date required)")
+    print("   23. 📝 Record Stock Transaction (with date)")
+    print("   24. 🔄 Refresh Stock Prices")
+    print()
+    print("  SIMULATIONS:")
+    print("   27. 🎲 View Configured Simulations")
+    print("   28. 🚀 Run Simulation")
+    print("   29. ➕ Add Simulation Config")
+    print("   30. ✏️  Edit Simulation Config")
+    print()
+    print("  ETF LIBRARY:")
+    print("   31. 📚 View ETF Library")
+    print("   32. ➕ Add ETF to Library")
+    print("   33. 🔍 Search ETF Library")
+    print()
     print("  SETUP:")
-    print("   20. ⚙️  Run Full Setup Wizard (creates new dated config)")
-    print("   21. 📂 Load Previous Config")
+    print("   25. ⚙️  Run Full Setup Wizard (creates new dated config)")
+    print("   26. 📂 Load Previous Config")
     print()
     print("    0. 🚪 Exit")
     print()
@@ -164,10 +193,10 @@ def get_menu_choice():
     """Get user's menu choice."""
     while True:
         try:
-            choice = input("Select option (0-21): ").strip()
-            if choice.isdigit() and 0 <= int(choice) <= 21:
+            choice = input("Select option (0-33): ").strip()
+            if choice.isdigit() and 0 <= int(choice) <= 33:
                 return int(choice)
-            print("⚠️  Please enter a number between 0 and 21")
+            print("⚠️  Please enter a number between 0 and 33")
         except KeyboardInterrupt:
             print("\n")
             return 0
@@ -697,6 +726,238 @@ def interactive_update(config_path: str):
         sys.exit(1)
 
 
+def view_simulations(config_path: str):
+    """View configured simulations."""
+    print_header("Configured Simulations")
+
+    try:
+        config = load_config(config_path)
+    except Exception as e:
+        print(f"❌ Error loading config: {e}")
+        return
+
+    if not config.simulations:
+        print("No simulations configured yet.\n")
+        print("To add a simulation, edit your config file and add to the 'simulations' section.")
+        return
+
+    for i, sim in enumerate(config.simulations, 1):
+        status = "✅ Enabled" if sim.enabled else "❌ Disabled"
+        print(f"{i}. {sim.name} ({status})")
+        print(f"   ID: {sim.id}")
+        print(f"   Initial balance: ${sim.initial_balance:,.2f}")
+        print(f"   Current age: {sim.current_age} → Target ages: {', '.join(map(str, sim.target_ages))}")
+        print(f"   Strategy: {sim.strategy_type}")
+        if sim.strategy_type == "monthly_liquidation":
+            print(f"   Liquidation day: {sim.liquidation_day}")
+        else:
+            print(f"   Hold period: {sim.hold_days} days")
+
+        # Show income sources with validation
+        if sim.income_source_ids:
+            matched_sources = [inc for inc in config.income if inc.id in sim.income_source_ids]
+            unmatched_ids = [sid for sid in sim.income_source_ids if sid not in [inc.id for inc in config.income]]
+
+            print(f"   Income sources: {len(matched_sources)} configured")
+            for inc in matched_sources:
+                print(f"      ✓ {inc.source} (${inc.amount:,.2f} {inc.frequency.value})")
+            if unmatched_ids:
+                print(f"      ⚠️  Unmatched IDs: {', '.join(unmatched_ids)}")
+        else:
+            print(f"   Income sources: None (only initial balance will be invested)")
+
+        print(f"   Simulations per run: {sim.num_simulations}")
+        print()
+
+
+def run_simulation_interactive(config_path: str):
+    """Run a simulation interactively."""
+    print_header("Run Simulation")
+
+    try:
+        config = load_config(config_path)
+    except Exception as e:
+        print(f"❌ Error loading config: {e}")
+        return
+
+    if not config.simulations:
+        print("No simulations configured.\n")
+        return
+
+    # Show available simulations
+    enabled_sims = [s for s in config.simulations if s.enabled]
+    if not enabled_sims:
+        print("No enabled simulations found.\n")
+        return
+
+    print("Available simulations:\n")
+    for i, sim in enumerate(enabled_sims, 1):
+        print(f"  {i}. {sim.name}")
+        print(f"     Strategy: {sim.strategy_type}")
+        print(f"     Target ages: {', '.join(map(str, sim.target_ages))}")
+        print()
+
+    # Get user selection
+    try:
+        choice = input(f"Select simulation (1-{len(enabled_sims)}, 0 to cancel): ").strip()
+        if not choice or choice == "0":
+            print("Cancelled.")
+            return
+
+        sim_idx = int(choice) - 1
+        if sim_idx < 0 or sim_idx >= len(enabled_sims):
+            print("Invalid selection.")
+            return
+
+        selected_sim = enabled_sims[sim_idx]
+    except (ValueError, KeyboardInterrupt):
+        print("\nCancelled.")
+        return
+
+    # Get target age
+    print(f"\nAvailable target ages: {', '.join(map(str, selected_sim.target_ages))}")
+    try:
+        age_input = input("Select target age (or press Enter for first): ").strip()
+        if not age_input:
+            target_age = selected_sim.target_ages[0]
+        else:
+            target_age = int(age_input)
+            if target_age not in selected_sim.target_ages:
+                print(f"⚠️  Age {target_age} not in configured targets, using anyway...")
+    except (ValueError, KeyboardInterrupt):
+        print("\nCancelled.")
+        return
+
+    # Allow temporary override of simulation count
+    years = target_age - selected_sim.current_age
+
+    # Estimate time based on which engine will be used
+    try:
+        import simulation_engine
+        rust_available = simulation_engine.RUST_AVAILABLE
+    except:
+        rust_available = False
+
+    if rust_available and selected_sim.num_simulations > 10:
+        # Rust: ~100,000 runs/sec
+        estimated_time = (selected_sim.num_simulations * years) / 100000 * 60  # in seconds, then to minutes
+        engine_note = " (Rust)"
+    else:
+        # Python: ~200 runs/sec
+        estimated_time = (selected_sim.num_simulations * years) / 200 / 60  # in minutes
+        engine_note = " (Python)"
+
+    print(f"\nConfigured simulations: {selected_sim.num_simulations}{engine_note} (estimated ~{estimated_time:.1f} minutes)")
+    override = input(f"Override count for this run? (press Enter to use {selected_sim.num_simulations}): ").strip()
+    if override:
+        try:
+            num_runs = int(override)
+            if num_runs > 0:
+                selected_sim = InvestmentSimulation(
+                    id=selected_sim.id,
+                    name=selected_sim.name,
+                    enabled=selected_sim.enabled,
+                    current_age=selected_sim.current_age,
+                    target_ages=selected_sim.target_ages,
+                    strategy_type=selected_sim.strategy_type,
+                    hold_days=selected_sim.hold_days,
+                    liquidation_day=selected_sim.liquidation_day,
+                    income_source_ids=selected_sim.income_source_ids,
+                    ticker=selected_sim.ticker,
+                    initial_balance=selected_sim.initial_balance,
+                    expected_annual_return=selected_sim.expected_annual_return,
+                    annual_volatility=selected_sim.annual_volatility,
+                    annual_dividend_yield=selected_sim.annual_dividend_yield,
+                    expense_ratio=selected_sim.expense_ratio,
+                    short_term_cap_gains_rate=selected_sim.short_term_cap_gains_rate,
+                    long_term_cap_gains_rate=selected_sim.long_term_cap_gains_rate,
+                    dividend_tax_rate=selected_sim.dividend_tax_rate,
+                    num_simulations=num_runs,
+                    random_seed=selected_sim.random_seed,
+                )
+                print(f"  Using {num_runs} simulations for this run")
+        except ValueError:
+            pass
+
+    # Validate income sources before running
+    print(f"\n🔍 Validating simulation configuration...")
+
+    if selected_sim.income_source_ids:
+        matched_sources = [inc for inc in config.income if inc.id in selected_sim.income_source_ids]
+        unmatched_ids = [sid for sid in selected_sim.income_source_ids if sid not in [inc.id for inc in config.income]]
+
+        if unmatched_ids:
+            print(f"\n❌ ERROR: Income source IDs not found in config!")
+            print(f"   Missing IDs: {', '.join(unmatched_ids)}")
+            print(f"\n   Available income IDs in config:")
+            for inc in config.income:
+                print(f"     - {inc.id} ({inc.source})")
+            print(f"\n   Please edit the simulation config (option 30) to fix the income_source_ids.")
+            return
+
+        if not matched_sources:
+            print(f"\n⚠️  WARNING: No income sources configured for this simulation!")
+            print(f"   The simulation will only use the initial balance of ${selected_sim.initial_balance:,.2f}")
+            proceed = input(f"   Continue anyway? (y/n): ").strip().lower()
+            if proceed != 'y':
+                print("Cancelled.")
+                return
+        else:
+            print(f"✓ Found {len(matched_sources)} income source(s):")
+            for inc in matched_sources:
+                print(f"    - {inc.source}: ${inc.amount:,.2f} {inc.frequency.value}")
+    else:
+        print(f"⚠️  No income sources configured - only initial balance will be invested")
+        proceed = input(f"   Continue with just ${selected_sim.initial_balance:,.2f} initial balance? (y/n): ").strip().lower()
+        if proceed != 'y':
+            print("Cancelled.")
+            return
+
+    if selected_sim.initial_balance == 0 and not selected_sim.income_source_ids:
+        print(f"\n❌ ERROR: Both initial balance and income sources are zero!")
+        print(f"   There is nothing to invest. Please edit the simulation config.")
+        return
+
+    # Run simulation
+    print(f"\n🚀 Starting simulation: {selected_sim.name}")
+    print(f"   Target age: {target_age}")
+    print(f"   Number of runs: {selected_sim.num_simulations}")
+    print(f"   Press Ctrl+C to interrupt at any time")
+    print()
+
+    try:
+        engine = SimulationEngine(config, selected_sim)
+        results = engine.run_monte_carlo(target_age=target_age)
+
+        # Display results
+        print_simulation_summary(results)
+
+        # Ask if they want to see actionable instructions
+        show_instructions = input("\nShow actionable buy/sell instructions? (y/n): ").strip().lower()
+        if show_instructions == "y":
+            print_actionable_instructions(results, max_instructions=50, config=config)
+
+        # Ask if they want to see sample run
+        show_sample = input("\nShow detailed sample run? (y/n): ").strip().lower()
+        if show_sample == "y":
+            print_sample_run(results.runs[0], max_events=20)
+
+        # Ask if they want to export to CSV
+        export = input("\nExport results to CSV? (y/n): ").strip().lower()
+        if export == "y":
+            from simulation_reports import export_results_to_csv
+            filename = f"simulation_{selected_sim.id}_age{target_age}_{date.today().isoformat()}.csv"
+            export_results_to_csv(results, filename)
+
+    except KeyboardInterrupt:
+        print(f"\n\n⚠️  Simulation interrupted by user!")
+        print(f"   Partial results may be incomplete.")
+    except Exception as e:
+        print(f"\n❌ Simulation failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+
 def run_interactive_mode(config_path: str = "financial_config.json"):
     """Run the interactive menu-driven interface."""
 
@@ -714,6 +975,90 @@ def run_interactive_mode(config_path: str = "financial_config.json"):
             break
 
         elif choice == 20:
+            # View Investment Portfolio
+            clear_screen()
+            view_investment_portfolio(current_config)
+            pause()
+            continue
+
+        elif choice == 21:
+            # Add Investment Account
+            clear_screen()
+            add_investment_account_to_config(current_config)
+            pause()
+            continue
+
+        elif choice == 22:
+            # Add Manual Position
+            clear_screen()
+            add_manual_position(current_config)
+            pause()
+            continue
+
+        elif choice == 23:
+            # Record Stock Transaction
+            clear_screen()
+            record_stock_transaction(current_config)
+            pause()
+            continue
+
+        elif choice == 24:
+            # Refresh Stock Prices
+            clear_screen()
+            refresh_stock_prices(current_config)
+            pause()
+            continue
+
+        elif choice == 27:
+            # View Configured Simulations
+            clear_screen()
+            view_simulations(current_config)
+            pause()
+            continue
+
+        elif choice == 28:
+            # Run Simulation
+            clear_screen()
+            run_simulation_interactive(current_config)
+            pause()
+            continue
+
+        elif choice == 29:
+            # Add Simulation Config
+            clear_screen()
+            add_simulation_to_config(current_config)
+            pause()
+            continue
+
+        elif choice == 30:
+            # Edit Simulation Config
+            clear_screen()
+            edit_simulation(current_config)
+            pause()
+            continue
+
+        elif choice == 31:
+            # View ETF Library
+            clear_screen()
+            view_etf_library()
+            pause()
+            continue
+
+        elif choice == 32:
+            # Add ETF to Library
+            clear_screen()
+            add_etf_interactive()
+            pause()
+            continue
+
+        elif choice == 33:
+            # Search ETF Library
+            clear_screen()
+            search_etf_interactive()
+            pause()
+            continue
+
+        elif choice == 25:
             # Run full setup wizard - creates new dated config
             clear_screen()
             dated_config = get_dated_config_name()
@@ -724,7 +1069,7 @@ def run_interactive_mode(config_path: str = "financial_config.json"):
                 pause()
             continue
 
-        elif choice == 21:
+        elif choice == 26:
             # Load previous config
             clear_screen()
             print_header("Load Previous Configuration")

@@ -1,0 +1,49 @@
+{
+  "accounts": [
+    {
+      "id": "test_checking",
+      "name": "Test Checking",
+      "type": "checking",
+      "balance": 1000.0,
+      "minimum_balance": 100.0
+    }
+  ],
+  "income": [],
+  "bills": [],
+  "credit_cards": [],
+  "manual_payments": [],
+  "recurring_expenses": [],
+  "investment_accounts": [
+    {
+      "id": "test_inv",
+      "name": "Test Investment Account",
+      "cash_balance": 2500.0,
+      "minimum_balance": 0.0,
+      "transactions": [
+        {
+          "id": "spy_buy_1",
+          "date": "2025-01-01",
+          "symbol": "SPY",
+          "transaction_type": "buy",
+          "shares": 10.0,
+          "price_per_share": 450.0,
+          "total_amount": 4500.0,
+          "notes": null
+        }
+      ],
+      "holdings": [
+        {
+          "symbol": "SPY",
+          "shares": 10.0,
+          "cost_basis": 4500.0,
+          "current_price": 460.0
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "emergency_fund_target": 1000.0,
+    "planning_horizon_days": 30,
+    "priority": "avalanche"
+  }
+}

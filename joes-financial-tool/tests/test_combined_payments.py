@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 """Test that payments to the same card on the same day are combined."""
 
 from config_loader import load_config

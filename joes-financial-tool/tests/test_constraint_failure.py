@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 """Test that simulations properly fail when constraints are violated."""
 
 from config_loader import load_config

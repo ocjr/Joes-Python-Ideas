@@ -1,0 +1,154 @@
+{
+  "etfs": [
+    {
+      "ticker": "SPY",
+      "name": "SPDR S&P 500 ETF Trust",
+      "expected_annual_return": 0.10,
+      "annual_volatility": 0.15,
+      "annual_dividend_yield": 0.015,
+      "expense_ratio": 0.0009,
+      "category": "Large Cap Blend",
+      "description": "Tracks the S&P 500 index. Broad exposure to large-cap US stocks. Most liquid ETF."
+    },
+    {
+      "ticker": "QQQ",
+      "name": "Invesco QQQ Trust",
+      "expected_annual_return": 0.13,
+      "annual_volatility": 0.20,
+      "annual_dividend_yield": 0.006,
+      "expense_ratio": 0.0020,
+      "category": "Large Cap Growth",
+      "description": "Tracks Nasdaq-100. Heavy tech exposure (Apple, Microsoft, etc.). Higher growth potential, higher volatility."
+    },
+    {
+      "ticker": "VTI",
+      "name": "Vanguard Total Stock Market ETF",
+      "expected_annual_return": 0.10,
+      "annual_volatility": 0.15,
+      "annual_dividend_yield": 0.015,
+      "expense_ratio": 0.0003,
+      "category": "Total Market",
+      "description": "Entire US stock market (large, mid, small cap). Maximum diversification at ultra-low cost."
+    },
+    {
+      "ticker": "VOO",
+      "name": "Vanguard S&P 500 ETF",
+      "expected_annual_return": 0.10,
+      "annual_volatility": 0.15,
+      "annual_dividend_yield": 0.015,
+      "expense_ratio": 0.0003,
+      "category": "Large Cap Blend",
+      "description": "Vanguard's S&P 500 tracker. Similar to SPY but with lower expense ratio."
+    },
+    {
+      "ticker": "SCHD",
+      "name": "Schwab U.S. Dividend Equity ETF",
+      "expected_annual_return": 0.12,
+      "annual_volatility": 0.18,
+      "annual_dividend_yield": 0.035,
+      "expense_ratio": 0.0006,
+      "category": "Dividend",
+      "description": "High-quality dividend growth stocks. Focus on consistent dividend payers with strong fundamentals."
+    },
+    {
+      "ticker": "VYM",
+      "name": "Vanguard High Dividend Yield ETF",
+      "expected_annual_return": 0.09,
+      "annual_volatility": 0.16,
+      "annual_dividend_yield": 0.030,
+      "expense_ratio": 0.0006,
+      "category": "Dividend",
+      "description": "Large-cap stocks with above-average dividend yields. Income-focused investing."
+    },
+    {
+      "ticker": "BND",
+      "name": "Vanguard Total Bond Market ETF",
+      "expected_annual_return": 0.03,
+      "annual_volatility": 0.05,
+      "annual_dividend_yield": 0.025,
+      "expense_ratio": 0.0003,
+      "category": "Bond",
+      "description": "Broad US investment-grade bond market. Conservative, lower volatility than stocks."
+    },
+    {
+      "ticker": "AGG",
+      "name": "iShares Core U.S. Aggregate Bond ETF",
+      "expected_annual_return": 0.03,
+      "annual_volatility": 0.05,
+      "annual_dividend_yield": 0.025,
+      "expense_ratio": 0.0003,
+      "category": "Bond",
+      "description": "Similar to BND. Total US bond market exposure. Good for portfolio stability."
+    },
+    {
+      "ticker": "VUG",
+      "name": "Vanguard Growth ETF",
+      "expected_annual_return": 0.12,
+      "annual_volatility": 0.18,
+      "annual_dividend_yield": 0.008,
+      "expense_ratio": 0.0004,
+      "category": "Large Cap Growth",
+      "description": "Large-cap growth stocks. Companies with strong earnings growth potential."
+    },
+    {
+      "ticker": "VTV",
+      "name": "Vanguard Value ETF",
+      "expected_annual_return": 0.09,
+      "annual_volatility": 0.16,
+      "annual_dividend_yield": 0.025,
+      "expense_ratio": 0.0004,
+      "category": "Large Cap Value",
+      "description": "Large-cap value stocks. Companies trading below their intrinsic value."
+    },
+    {
+      "ticker": "VGT",
+      "name": "Vanguard Information Technology ETF",
+      "expected_annual_return": 0.15,
+      "annual_volatility": 0.22,
+      "annual_dividend_yield": 0.008,
+      "expense_ratio": 0.0010,
+      "category": "Sector - Technology",
+      "description": "Pure technology sector play. High growth potential, high volatility. Not diversified."
+    },
+    {
+      "ticker": "IWM",
+      "name": "iShares Russell 2000 ETF",
+      "expected_annual_return": 0.11,
+      "annual_volatility": 0.22,
+      "annual_dividend_yield": 0.012,
+      "expense_ratio": 0.0019,
+      "category": "Small Cap Blend",
+      "description": "Small-cap US stocks. Higher volatility but potential for higher returns."
+    },
+    {
+      "ticker": "VXUS",
+      "name": "Vanguard Total International Stock ETF",
+      "expected_annual_return": 0.08,
+      "annual_volatility": 0.17,
+      "annual_dividend_yield": 0.028,
+      "expense_ratio": 0.0007,
+      "category": "International",
+      "description": "Non-US developed and emerging markets. Geographic diversification outside US."
+    },
+    {
+      "ticker": "VNQ",
+      "name": "Vanguard Real Estate ETF",
+      "expected_annual_return": 0.10,
+      "annual_volatility": 0.20,
+      "annual_dividend_yield": 0.035,
+      "expense_ratio": 0.0012,
+      "category": "Real Estate",
+      "description": "REITs and real estate companies. High dividend yield, inflation hedge potential."
+    },
+    {
+      "ticker": "GLD",
+      "name": "SPDR Gold Shares",
+      "expected_annual_return": 0.05,
+      "annual_volatility": 0.16,
+      "annual_dividend_yield": 0.0,
+      "expense_ratio": 0.0040,
+      "category": "Commodity",
+      "description": "Physical gold. Inflation hedge, portfolio diversifier. No dividends, higher expense ratio."
+    }
+  ]
+}

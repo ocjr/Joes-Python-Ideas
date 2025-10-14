@@ -1,0 +1,44 @@
+{
+  "accounts": [
+    {
+      "id": "test_checking",
+      "name": "Test Checking",
+      "type": "checking",
+      "balance": 1000.0,
+      "minimum_balance": 0.0
+    }
+  ],
+  "income": [],
+  "bills": [],
+  "credit_cards": [],
+  "manual_payments": [],
+  "recurring_expenses": [],
+  "investment_accounts": [
+    {
+      "id": "test_inv",
+      "name": "Test Investment Account",
+      "cash_balance": 5000.0,
+      "minimum_balance": 0.0,
+      "transactions": [],
+      "holdings": [
+        {
+          "symbol": "AAPL",
+          "shares": 100.0,
+          "cost_basis": 15000.0,
+          "current_price": 175.0
+        },
+        {
+          "symbol": "TSLA",
+          "shares": 50.0,
+          "cost_basis": 10000.0,
+          "current_price": 220.0
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "emergency_fund_target": 1000.0,
+    "planning_horizon_days": 30,
+    "priority": "avalanche"
+  }
+}

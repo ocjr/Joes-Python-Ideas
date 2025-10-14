@@ -18,6 +18,10 @@ from models import (
     Settings,
     ManualPayment,
     RecurringExpense,
+    InvestmentAccount,
+    StockTransaction,
+    StockHolding,
+    InvestmentSimulation,
 )
 
 
@@ -96,6 +100,16 @@ def load_config(config_path: Union[str, Path]) -> FinancialConfig:
             RecurringExpense(**exp) for exp in data.get("recurring_expenses", [])
         ]
 
+        # Parse investment accounts
+        investment_accounts = [
+            InvestmentAccount(**inv_acc) for inv_acc in data.get("investment_accounts", [])
+        ]
+
+        # Parse simulations
+        simulations = [
+            InvestmentSimulation(**sim) for sim in data.get("simulations", [])
+        ]
+
         # Parse settings
         settings_data = data.get("settings", {})
         settings = Settings(**settings_data)
@@ -108,6 +122,8 @@ def load_config(config_path: Union[str, Path]) -> FinancialConfig:
             settings=settings,
             manual_payments=manual_payments,
             recurring_expenses=recurring_expenses,
+            investment_accounts=investment_accounts,
+            simulations=simulations,
         )
     except (KeyError, TypeError, ValueError) as e:
         raise ValueError(f"Error parsing configuration: {e}") from e
@@ -231,6 +247,66 @@ def save_config(config: FinancialConfig, config_path: Union[str, Path]) -> None:
                 "next_date": exp.next_date.isoformat() if exp.next_date else None,
             }
             for exp in config.recurring_expenses
+        ],
+        "investment_accounts": [
+            {
+                "id": inv_acc.id,
+                "name": inv_acc.name,
+                "cash_balance": inv_acc.cash_balance,
+                "minimum_balance": inv_acc.minimum_balance,
+                "default_commission": inv_acc.default_commission,
+                "transactions": [
+                    {
+                        "id": txn.id,
+                        "date": txn.date.isoformat(),
+                        "symbol": txn.symbol,
+                        "transaction_type": txn.transaction_type,
+                        "shares": txn.shares,
+                        "price_per_share": txn.price_per_share,
+                        "total_amount": txn.total_amount,
+                        "commission": txn.commission,
+                        "settlement_date": txn.settlement_date.isoformat() if txn.settlement_date else None,
+                        "notes": txn.notes,
+                    }
+                    for txn in inv_acc.transactions
+                ],
+                "holdings": [
+                    {
+                        "symbol": holding.symbol,
+                        "shares": holding.shares,
+                        "cost_basis": holding.cost_basis,
+                        "current_price": holding.current_price,
+                    }
+                    for holding in inv_acc.holdings
+                ],
+            }
+            for inv_acc in config.investment_accounts
+        ],
+        "simulations": [
+            {
+                "id": sim.id,
+                "name": sim.name,
+                "enabled": sim.enabled,
+                "current_age": sim.current_age,
+                "target_ages": sim.target_ages,
+                "strategy_type": sim.strategy_type,
+                "hold_days": sim.hold_days,
+                "liquidation_day": sim.liquidation_day,
+                "income_source_ids": sim.income_source_ids,
+                "ticker": sim.ticker,
+                "initial_balance": sim.initial_balance,
+                "expected_annual_return": sim.expected_annual_return,
+                "annual_volatility": sim.annual_volatility,
+                "annual_dividend_yield": sim.annual_dividend_yield,
+                "expense_ratio": sim.expense_ratio,
+                "short_term_cap_gains_rate": sim.short_term_cap_gains_rate,
+                "long_term_cap_gains_rate": sim.long_term_cap_gains_rate,
+                "dividend_tax_rate": sim.dividend_tax_rate,
+                "num_simulations": sim.num_simulations,
+                "random_seed": sim.random_seed,
+                "investment_account_id": sim.investment_account_id,
+            }
+            for sim in config.simulations
         ],
         "settings": {
             "emergency_fund_target": config.settings.emergency_fund_target,

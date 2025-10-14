@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 """Test the improved failure output in CLI."""
 
 from config_loader import load_config

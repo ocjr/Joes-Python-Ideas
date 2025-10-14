@@ -19,6 +19,9 @@ from models import (
     IncomeSplit,
     ManualPayment,
     RecurringExpense,
+    InvestmentAccount,
+    StockTransaction,
+    StockHolding,
 )
 from config_loader import save_config, load_config
 
@@ -869,6 +872,73 @@ def add_recurring_expense_to_config(config_path: str = "financial_config.json"):
 
     print(f"\n✓ Added recurring expense: {name} ${amount:,.2f} {frequency}")
     print(f"✓ Configuration updated!\n")
+    return True
+
+
+def add_investment_account_to_config(config_path: str = "financial_config.json"):
+    """Add a single investment account to existing config."""
+    try:
+        config = load_config(config_path)
+    except FileNotFoundError:
+        print(f"❌ Config file not found: {config_path}")
+        return False
+    except Exception as e:
+        print(f"❌ Error loading config: {e}")
+        return False
+
+    print_header("Add Investment Account")
+    print("Let's add an investment/brokerage account to track stocks.\n")
+
+    name = get_input("Account name (e.g., 'Robinhood', 'Fidelity 401k', 'Schwab')")
+
+    # Check if account with this name already exists
+    account_id = name.lower().replace(" ", "_")
+    if any(acc.id == account_id for acc in config.investment_accounts):
+        print(f"⚠️  An investment account with ID '{account_id}' already exists!")
+        if not get_input("Continue anyway? (y/n)", default="n", input_type=bool):
+            return False
+
+    cash_balance = get_input(
+        "Current cash balance in account", default=0.0, input_type=float
+    )
+    minimum_balance = (
+        get_input(
+            "Minimum cash balance to maintain",
+            default=0.0,
+            input_type=float,
+            required=False,
+        )
+        or 0.0
+    )
+    default_commission = (
+        get_input(
+            "Default commission per trade (0 for commission-free)",
+            default=0.0,
+            input_type=float,
+            required=False,
+        )
+        or 0.0
+    )
+
+    # Create investment account
+    new_account = InvestmentAccount(
+        id=account_id,
+        name=name,
+        cash_balance=cash_balance,
+        minimum_balance=minimum_balance,
+        default_commission=default_commission,
+        transactions=[],
+        holdings=[],
+    )
+
+    config.investment_accounts.append(new_account)
+    save_config(config, config_path)
+
+    print(f"\n✓ Added investment account: {name} (Cash: ${cash_balance:,.2f})")
+    print(f"✓ Configuration updated!")
+    print(f"\nNext steps:")
+    print(f"  - Use menu to record stock transactions (buys/sells)")
+    print(f"  - Refresh stock prices to see current market value\n")
     return True
 
 
